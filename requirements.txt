@@ -1,0 +1,8 @@
+py-desmume==0.0.3
+gymnasium==0.29.1
+stable-baselines3[extra]==2.2.1
+mlflow==2.11.1
+opencv-python==4.9.0.80
+numpy==1.26.4
+torch==2.2.1
+tensorboard==2.16.2
