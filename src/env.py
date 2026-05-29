@@ -64,6 +64,8 @@ class MarioNdsEnv(gym.Env):
 
         # Optical flow needs previous frame
         self.prev_gray = None
+        self.accumulated_camera_x = 0.0
+        self.last_mario_screen_x = 10.0
         self.current_x = 0
         self.frameskip = 6 # Aumentado de 4 para 6
 
@@ -85,26 +87,34 @@ class MarioNdsEnv(gym.Env):
             # If background moves left, Mario is moving right
             reward_displacement = 0.0
             if self.prev_gray is not None:
-                # Calculate dense optical flow
+                # 1. Camera Displacement (Background moving left = camera panning right)
                 flow = cv2.calcOpticalFlowFarneback(self.prev_gray, resized, None, 
                                                     0.5, 3, 15, 3, 5, 1.2, 0)
-                # Average horizontal flow (flow[..., 0])
-                avg_flow_x = np.mean(flow[..., 0])
                 
-                # Convert flow to displacement (negative flow means Mario moved right)
-                if avg_flow_x < -0.2:  
-                    flow_disp = -avg_flow_x
-                elif avg_flow_x > 0.2:
-                    flow_disp = -avg_flow_x # This will be negative since avg_flow_x is positive
-                else:
-                    flow_disp = 0.0
-                    
-                self.accumulated_x += flow_disp
+                # Use median flow to ignore Mario's foreground motion and track pure background
+                median_flow_x = np.median(flow[..., 0])
                 
-                # ONLY reward Mario if he reaches a new record distance in this episode
-                if self.accumulated_x > self.max_x:
-                    reward_displacement = (self.accumulated_x - self.max_x) * 5.0
-                    self.max_x = self.accumulated_x
+                if median_flow_x < -0.2:  
+                    self.accumulated_camera_x += (-median_flow_x)
+                elif median_flow_x > 0.2:
+                    self.accumulated_camera_x -= median_flow_x
+                
+                # 2. Mario's on-screen movement via AbsDiff
+                diff = cv2.absdiff(self.prev_gray, resized)
+                _, thresh = cv2.threshold(diff, 15, 255, cv2.THRESH_BINARY)
+                
+                moving_pixels = np.column_stack(np.where(thresh > 0))
+                if len(moving_pixels) > 5:
+                    # moving_pixels[:, 1] is the X coordinate
+                    self.last_mario_screen_x = np.median(moving_pixels[:, 1])
+                
+                # 3. Combine them for a universal X position
+                current_total_x = self.accumulated_camera_x + self.last_mario_screen_x
+                self.accumulated_x = current_total_x # Update for rendering/info
+                
+                if current_total_x > self.max_x:
+                    reward_displacement = (current_total_x - self.max_x) * 2.0
+                    self.max_x = current_total_x
                 else:
                     reward_displacement = 0.0
                 
@@ -212,7 +222,9 @@ class MarioNdsEnv(gym.Env):
             self.emu.savestate.load_file(self.state_path)
             
         self.accumulated_x = 0.0
-        self.max_x = 0.0
+        self.accumulated_camera_x = 0.0
+        self.last_mario_screen_x = 10.0
+        self.max_x = 10.0
         self.episode_steps = 0
         self.prev_gray = None
         obs = self._get_obs()
