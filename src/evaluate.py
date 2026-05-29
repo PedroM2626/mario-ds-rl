@@ -9,9 +9,13 @@ def main():
     parser.add_argument("--rom", type=str, default="../data/mario.nds", help="Path to NDS ROM")
     parser.add_argument("--state", type=str, default="../data/state.dst", help="Path to Savestate")
     parser.add_argument("--episodes", type=int, default=5, help="Number of episodes to evaluate")
+    parser.add_argument("--stochastic", action="store_true", help="Evaluate stochastically (useful to see untrained models mash buttons)")
     args = parser.parse_args()
-
+    from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack
+    
     env = MarioNdsEnv(rom_path=args.rom, state_path=args.state, render_mode="human")
+    env = DummyVecEnv([lambda: env])
+    env = VecFrameStack(env, n_stack=4)
     
     try:
         model = PPO.load(args.model, env=env)
@@ -21,15 +25,14 @@ def main():
         return
 
     for episode in range(args.episodes):
-        obs, _ = env.reset()
-        done = False
-        truncated = False
+        obs = env.reset()
+        done = [False]
         total_reward = 0
         
-        while not (done or truncated):
-            action, _states = model.predict(obs, deterministic=True)
-            obs, reward, done, truncated, info = env.step(action)
-            total_reward += reward
+        while not done[0]:
+            action, _states = model.predict(obs, deterministic=not args.stochastic)
+            obs, reward, done, info = env.step(action)
+            total_reward += reward[0]
             env.render()
             time.sleep(0.01) # Slight pause to make it watchable
             

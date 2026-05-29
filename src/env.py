@@ -6,13 +6,16 @@ import os
 
 try:
     from desmume.emulator import DeSmuME
-    from desmume.controls import Keys
+    from desmume.controls import Keys, keymask
 except ImportError:
     print("Warning: py-desmume is not installed or failed to load.")
     # Provide dummy classes for testing without emulator
     class Keys:
         KEY_A = 1; KEY_B = 2; KEY_X = 4; KEY_Y = 8; KEY_UP = 16; KEY_DOWN = 32; KEY_LEFT = 64; KEY_RIGHT = 128
         KEY_START = 256; KEY_SELECT = 512; KEY_L = 1024; KEY_R = 2048
+        
+    def keymask(k):
+        return k
 
 class MarioNdsEnv(gym.Env):
     """
@@ -50,7 +53,8 @@ class MarioNdsEnv(gym.Env):
             self.has_emulator = False
 
         # Define action space
-        # Actions: 0: Noop, 1: Right, 2: Right+Dash(B), 3: Right+Dash+Jump(A), 4: Left, 5: Jump
+        # Ações restauradas para o controle total do Mario
+        # Actions: 0: Noop, 1: Right, 2: Right+Dash(B), 3: Right+Dash+Jump(B+A), 4: Left, 5: Jump(A)
         self.action_space = spaces.Discrete(6)
         
         # Define observation space (RGB image of the top screen: 256x192)
@@ -86,12 +90,23 @@ class MarioNdsEnv(gym.Env):
                                                     0.5, 3, 15, 3, 5, 1.2, 0)
                 # Average horizontal flow (flow[..., 0])
                 avg_flow_x = np.mean(flow[..., 0])
-                # If avg_flow_x is negative, background moved left -> Mario moved right
-                # If camera is stationary and Mario moves right, his pixels move right (positive)
-                # We can use the absolute horizontal activity or specific direction.
-                # Actually, a simpler robust metric for CV is just the absolute difference or flow magnitude.
-                # But to encourage going right: background goes left (avg_flow_x < 0) or Mario goes right (positive flow in center)
-                reward_displacement = -avg_flow_x if avg_flow_x < 0 else (avg_flow_x * 0.1)
+                
+                # Convert flow to displacement (negative flow means Mario moved right)
+                if avg_flow_x < -0.2:  
+                    flow_disp = -avg_flow_x
+                elif avg_flow_x > 0.2:
+                    flow_disp = -avg_flow_x # This will be negative since avg_flow_x is positive
+                else:
+                    flow_disp = 0.0
+                    
+                self.accumulated_x += flow_disp
+                
+                # ONLY reward Mario if he reaches a new record distance in this episode
+                if self.accumulated_x > self.max_x:
+                    reward_displacement = (self.accumulated_x - self.max_x) * 5.0
+                    self.max_x = self.accumulated_x
+                else:
+                    reward_displacement = 0.0
                 
             self.prev_gray = resized.copy()
             self.last_reward_displacement = reward_displacement
@@ -142,13 +157,13 @@ class MarioNdsEnv(gym.Env):
 
         # Apply inputs and run frameskip
         for key in keys:
-            self.emu.input.keypad_add_key(key)
+            self.emu.input.keypad_add_key(keymask(key))
             
         for _ in range(self.frameskip):
             self.emu.cycle()
             
         for key in keys:
-            self.emu.input.keypad_rm_key(key)
+            self.emu.input.keypad_rm_key(keymask(key))
 
         # Get observation (this also updates self.last_reward_displacement)
         obs = self._get_obs()
@@ -158,14 +173,22 @@ class MarioNdsEnv(gym.Env):
             reward = 1.0
         else:
             # We use the displacement calculated in _get_obs
-            # Add a small time penalty to encourage speed
-            time_penalty = -0.01
+            # Reduzimos a penalidade de tempo para evitar o suicídio intencional, 
+            # mas ainda forçamos ele a não ficar parado para sempre.
+            time_penalty = -0.05
             reward = self.last_reward_displacement + time_penalty
-            self.current_x += reward # Track approximate distance for info
+            self.current_x = self.accumulated_x # Track approximate distance for info
         
         # Check if done (e.g., Mario dies or wins)
         done = False 
         truncated = False
+        
+        # Add timeout to prevent infinite standing still episodes
+        # 1 step = 4 frames. 60 frames = 1 sec. 1 step = 1/15 sec.
+        # 2m50s = 170 segundos. 170 * 15 = 2550 steps.
+        self.episode_steps += 1
+        if self.episode_steps >= 2550:
+            truncated = True
         
         if self.death_mask is not None:
             # Check if the current observation matches the black Bowser silhouette
@@ -175,7 +198,7 @@ class MarioNdsEnv(gym.Env):
             
             if black_match_ratio > 0.90:  # 90% of the mask matches
                 done = True
-                reward -= 50.0  # Big penalty for dying
+                reward -= 30.0  
                 print("Death detected!")
                 
         info = self._get_info()
@@ -188,7 +211,9 @@ class MarioNdsEnv(gym.Env):
         if self.has_emulator:
             self.emu.savestate.load_file(self.state_path)
             
-        self.current_x = 0
+        self.accumulated_x = 0.0
+        self.max_x = 0.0
+        self.episode_steps = 0
         self.prev_gray = None
         obs = self._get_obs()
         info = self._get_info()
