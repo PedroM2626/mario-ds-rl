@@ -11,8 +11,8 @@ except ImportError:
     print("Warning: py-desmume is not installed or failed to load.")
     # Provide dummy classes for testing without emulator
     class Keys:
-        A = 1; B = 2; X = 4; Y = 8; UP = 16; DOWN = 32; LEFT = 64; RIGHT = 128
-        START = 256; SELECT = 512; L = 1024; R = 2048
+        KEY_A = 1; KEY_B = 2; KEY_X = 4; KEY_Y = 8; KEY_UP = 16; KEY_DOWN = 32; KEY_LEFT = 64; KEY_RIGHT = 128
+        KEY_START = 256; KEY_SELECT = 512; KEY_L = 1024; KEY_R = 2048
 
 class MarioNdsEnv(gym.Env):
     """
@@ -26,6 +26,18 @@ class MarioNdsEnv(gym.Env):
         self.rom_path = rom_path
         self.state_path = state_path
         self.render_mode = render_mode
+        
+        # Load death template mask if available
+        self.death_mask = None
+        # Try to find images/death.png relative to the project root
+        death_img_path = os.path.abspath(os.path.join(os.path.dirname(self.rom_path), '../images/death.png'))
+        if os.path.exists(death_img_path):
+            d_img = cv2.imread(death_img_path)
+            if d_img is not None:
+                d_gray = cv2.cvtColor(d_img, cv2.COLOR_BGR2GRAY)
+                d_resized = cv2.resize(d_gray, (84, 84), interpolation=cv2.INTER_AREA)
+                self.death_mask = (d_resized < 10)
+                print("Loaded death.png mask for Game Over detection.")
         
         # Initialize Emulator
         try:
@@ -46,6 +58,8 @@ class MarioNdsEnv(gym.Env):
         self.observation_space = spaces.Box(low=0, high=255,
                                             shape=(84, 84, 1), dtype=np.uint8)
 
+        # Optical flow needs previous frame
+        self.prev_gray = None
         self.current_x = 0
         self.frameskip = 4
 
@@ -53,22 +67,38 @@ class MarioNdsEnv(gym.Env):
         if not self.has_emulator:
             return np.zeros((84, 84, 1), dtype=np.uint8)
             
-        # Get frame from top screen (or bottom, depending on where gameplay is)
-        # In NSMB DS, gameplay is mostly on the top screen
-        frame = self.emu.display_buffer_as_rgbx() # This might need adjustment based on py-desmume API
-        # py-desmume display_buffer returns raw pixels. We assume a method or reshape.
-        # For this skeleton, we handle it generally:
         try:
-            # The DS screen is 256x384 total (two 256x192 screens)
-            # frame is usually a flat array or 256x384x4
+            # We assume display_buffer_as_rgbx returns a flat array of 256x384x4 (RGBA)
+            frame = self.emu.display_buffer_as_rgbx()
             frame = np.array(frame, dtype=np.uint8).reshape((384, 256, 4))
             top_screen = frame[:192, :, :3] # Take top half, RGB only
             
             # Convert to grayscale and resize
             gray = cv2.cvtColor(top_screen, cv2.COLOR_RGB2GRAY)
             resized = cv2.resize(gray, (84, 84), interpolation=cv2.INTER_AREA)
+            
+            # Optical Flow reward calculation: track the background scrolling
+            # If background moves left, Mario is moving right
+            reward_displacement = 0.0
+            if self.prev_gray is not None:
+                # Calculate dense optical flow
+                flow = cv2.calcOpticalFlowFarneback(self.prev_gray, resized, None, 
+                                                    0.5, 3, 15, 3, 5, 1.2, 0)
+                # Average horizontal flow (flow[..., 0])
+                avg_flow_x = np.mean(flow[..., 0])
+                # If avg_flow_x is negative, background moved left -> Mario moved right
+                # If camera is stationary and Mario moves right, his pixels move right (positive)
+                # We can use the absolute horizontal activity or specific direction.
+                # Actually, a simpler robust metric for CV is just the absolute difference or flow magnitude.
+                # But to encourage going right: background goes left (avg_flow_x < 0) or Mario goes right (positive flow in center)
+                reward_displacement = -avg_flow_x if avg_flow_x < 0 else (avg_flow_x * 0.1)
+                
+            self.prev_gray = resized.copy()
+            self.last_reward_displacement = reward_displacement
+            
             return np.expand_dims(resized, axis=-1)
         except Exception:
+            self.last_reward_displacement = 0.0
             return np.zeros((84, 84, 1), dtype=np.uint8)
 
     def _get_info(self):
@@ -97,18 +127,18 @@ class MarioNdsEnv(gym.Env):
         # Map actions to emulator keys
         keys = []
         if action == 1:
-            keys.append(Keys.RIGHT)
+            keys.append(Keys.KEY_RIGHT)
         elif action == 2:
-            keys.append(Keys.RIGHT)
-            keys.append(Keys.B)
+            keys.append(Keys.KEY_RIGHT)
+            keys.append(Keys.KEY_B)
         elif action == 3:
-            keys.append(Keys.RIGHT)
-            keys.append(Keys.B)
-            keys.append(Keys.A)
+            keys.append(Keys.KEY_RIGHT)
+            keys.append(Keys.KEY_B)
+            keys.append(Keys.KEY_A)
         elif action == 4:
-            keys.append(Keys.LEFT)
+            keys.append(Keys.KEY_LEFT)
         elif action == 5:
-            keys.append(Keys.A)
+            keys.append(Keys.KEY_A)
 
         # Apply inputs and run frameskip
         for key in keys:
@@ -120,18 +150,34 @@ class MarioNdsEnv(gym.Env):
         for key in keys:
             self.emu.input.keypad_rm_key(key)
 
-        # Get observation
+        # Get observation (this also updates self.last_reward_displacement)
         obs = self._get_obs()
         
-        # Calculate Reward (e.g., based on moving right)
-        new_x = self._get_mario_x()
-        reward = new_x - self.current_x
-        self.current_x = new_x
+        # Calculate Reward based on computer vision optical flow
+        if not self.has_emulator:
+            reward = 1.0
+        else:
+            # We use the displacement calculated in _get_obs
+            # Add a small time penalty to encourage speed
+            time_penalty = -0.01
+            reward = self.last_reward_displacement + time_penalty
+            self.current_x += reward # Track approximate distance for info
         
         # Check if done (e.g., Mario dies or wins)
-        # You would read a RAM address to check for death (e.g., 0x0208B364 for lives)
         done = False 
         truncated = False
+        
+        if self.death_mask is not None:
+            # Check if the current observation matches the black Bowser silhouette
+            obs_2d = np.squeeze(obs)
+            # Calculate what percentage of the expected black pixels are actually black
+            black_match_ratio = np.mean(obs_2d[self.death_mask] < 10)
+            
+            if black_match_ratio > 0.90:  # 90% of the mask matches
+                done = True
+                reward -= 50.0  # Big penalty for dying
+                print("Death detected!")
+                
         info = self._get_info()
 
         return obs, reward, done, truncated, info
@@ -143,13 +189,19 @@ class MarioNdsEnv(gym.Env):
             self.emu.savestate.load_file(self.state_path)
             
         self.current_x = 0
+        self.prev_gray = None
         obs = self._get_obs()
         info = self._get_info()
         return obs, info
 
     def render(self):
         if self.render_mode == 'human':
-            pass # Implement rendering with OpenCV if needed
+            obs = self._get_obs()
+            if obs is not None:
+                # Rescale 84x84 up for better visibility
+                display_img = cv2.resize(obs, (336, 336), interpolation=cv2.INTER_NEAREST)
+                cv2.imshow("Mario DS RL", display_img)
+                cv2.waitKey(1)
         elif self.render_mode == 'rgb_array':
             return self._get_obs()
 
