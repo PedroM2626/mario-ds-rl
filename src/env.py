@@ -65,7 +65,7 @@ class MarioNdsEnv(gym.Env):
         # Optical flow needs previous frame
         self.prev_gray = None
         self.current_x = 0
-        self.frameskip = 4
+        self.frameskip = 6 # Aumentado de 4 para 6
 
     def _get_obs(self):
         if not self.has_emulator:
@@ -184,10 +184,10 @@ class MarioNdsEnv(gym.Env):
         truncated = False
         
         # Add timeout to prevent infinite standing still episodes
-        # 1 step = 4 frames. 60 frames = 1 sec. 1 step = 1/15 sec.
-        # 2m50s = 170 segundos. 170 * 15 = 2550 steps.
+        # 1 step = 6 frames. 60 frames = 1 sec. 1 step = 1/10 sec.
+        # 2m50s = 170 segundos. 170 * 10 = 1700 steps.
         self.episode_steps += 1
-        if self.episode_steps >= 2550:
+        if self.episode_steps >= 1700:
             truncated = True
         
         if self.death_mask is not None:

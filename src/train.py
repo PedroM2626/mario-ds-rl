@@ -60,7 +60,7 @@ def main():
         # Log parameters
         mlflow.log_param("model_type", "PPO")
         mlflow.log_param("total_timesteps", args.timesteps)
-        mlflow.log_param("frameskip", 4)
+        mlflow.log_param("frameskip", 6)
         
         # Create parallel environments
         from stable_baselines3.common.vec_env import SubprocVecEnv, VecFrameStack
