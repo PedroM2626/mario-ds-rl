@@ -2,7 +2,7 @@ import os
 import argparse
 import mlflow
 from stable_baselines3 import PPO
-from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import torch
 import torch.nn as nn
@@ -150,11 +150,21 @@ def main():
         
         timesteps = 1000 if args.test_run else args.timesteps
         
+        # Configurar Checkpoint Auto-Save (salva a cada 40.000 steps = 10000 * 4 envs)
+        save_freq = 10000
+        checkpoint_callback = CheckpointCallback(
+            save_freq=save_freq,
+            save_path='./models/checkpoints/',
+            name_prefix=args.run_id,
+            save_replay_buffer=False,
+            save_vecnormalize=True
+        )
+
         # Train Model with graceful interruption
         try:
             # If resuming, we tell SB3 NOT to reset the global step counter and learning rate schedule
             reset_ts = False if args.resume else True
-            model.learn(total_timesteps=timesteps, callback=MLflowCallback(), reset_num_timesteps=reset_ts)
+            model.learn(total_timesteps=timesteps, callback=[MLflowCallback(), checkpoint_callback], reset_num_timesteps=reset_ts)
         except KeyboardInterrupt:
             print("\nTreinamento interrompido pelo usuário! Salvando o progresso atual...")
 

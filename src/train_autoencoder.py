@@ -49,7 +49,7 @@ class MarioAutoencoder(nn.Module):
 
 def main():
     parser = argparse.ArgumentParser(description="Train Autoencoder on collected Mario frames")
-    parser.add_argument("--dataset", type=str, default="../data/mario_dataset.npz", help="Path to .npz dataset")
+    parser.add_argument("--dataset", type=str, default="data/mario_dataset.npz", help="Path to .npz dataset")
     parser.add_argument("--epochs", type=int, default=20, help="Number of training epochs")
     parser.add_argument("--batch-size", type=int, default=64, help="Batch size")
     args = parser.parse_args()

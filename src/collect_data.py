@@ -6,10 +6,10 @@ from tqdm import tqdm
 
 def main():
     parser = argparse.ArgumentParser(description="Collect random gameplay frames for Unsupervised Learning")
-    parser.add_argument("--rom", type=str, default="../data/mario.nds", help="Path to NDS ROM")
-    parser.add_argument("--state", type=str, default="../data/state.dst", help="Path to Savestate")
+    parser.add_argument("--rom", type=str, default="data/mario.nds", help="Path to NDS ROM")
+    parser.add_argument("--state", type=str, default="data/state.dst", help="Path to Savestate")
     parser.add_argument("--num-frames", type=int, default=10000, help="Number of frames to collect")
-    parser.add_argument("--output", type=str, default="../data/mario_dataset.npz", help="Output .npz file")
+    parser.add_argument("--output", type=str, default="data/mario_dataset.npz", help="Output .npz file")
     args = parser.parse_args()
 
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
