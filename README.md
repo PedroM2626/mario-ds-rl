@@ -72,6 +72,13 @@ python src/train.py --rom "data/mario.nds" --state "data/state.dst" --timesteps 
 
 ## 💾 Comandos Úteis e MLOps
 
+### Nomear o Treinamento (Evitar Sobrescrita)
+Por padrão, o projeto salva o modelo como `ppo_mario.zip`. Se você for testar as 3 rotas, é essencial dar um nome para o seu treino para não apagar os outros. Use a flag `--run-id`:
+```bash
+python src/train.py --run-id "mario_icm_v1" --use-icm
+```
+Isso salvará o modelo como `models/mario_icm_v1.zip` e colocará o mesmo nome nos gráficos do MLflow!
+
 ### Continuar um Treino Parado (Resume)
 O projeto conta com salvamento gracioso. Se você apertar `Ctrl+C`, ele salva o modelo sem corromper. Para continuar o treino de onde parou (mantendo gráficos contínuos e taxas de aprendizado precisas):
 ```bash
@@ -91,3 +98,24 @@ Este projeto usa MLOps. Para ver os gráficos de recompensa, morte, duração do
 mlflow ui
 ```
 Em seguida, acesse `http://localhost:5000` no seu navegador!
+
+---
+
+## 📊 Comparativo de Performance das 3 Rotas
+
+Qual rota é a "melhor"? Depende do que você quer priorizar: velocidade do processador ou velocidade de aprendizado.
+
+| Rota | Velocidade do PC (FPS) | Eficiência de Aprendizado (Sample Efficiency) | Descrição |
+|---|---|---|---|
+| **1. RL Puro** | 🚀🚀🚀 (Muito Rápido) | 🐢 (Lento) | O PC roda rápido, mas a IA demora para aprender o que é um inimigo. |
+| **2. Autoencoder** | 🚀🚀 (Rápido) | 🧠🧠🧠 (Mestre Rápido) | O melhor custo-benefício. O custo no PC é quase igual à Rota 1, mas o Mario aprende incrivelmente rápido pois sua "visão" já está calibrada. |
+| **3. Módulo ICM** | 🐢 (Muito Lento) | 🧠🧠 (Muito Bom) | A curiosidade resolve quebra-cabeças complexos rapidamente, mas rodar 3 redes neurais ao mesmo tempo sacrifica o FPS do seu processador. |
+
+---
+
+## 🧠 Curiosidades de IA (Reward Hacking)
+Um dos maiores desafios resolvidos neste projeto foi o **Reward Hacking**. Como o emulador de DS possui uma "Zona Morta" de câmera (a câmera não acompanha o Mario nos primeiros passos da fase), o Optical Flow clássico punia a IA por andar para frente. 
+
+A IA aprendeu a hackear o sistema: ela pulava no frame 0 (para causar um solavanco de pontuação falsa na câmera) e cometia suicídio no Goomba o mais rápido possível para resetar a fase e farmar pontos infinitamente!
+
+**A Solução:** O projeto agora utiliza um rastreador de centro de massa `cv2.absdiff` em conjunto com o Optical Flow `np.median` para calcular um **X Universal**. O suicídio não é mais a opção matematicamente perfeita.

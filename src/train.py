@@ -89,6 +89,7 @@ def main():
     parser.add_argument("--num-envs", type=int, default=4, help="Number of parallel environments to run")
     parser.add_argument("--use-autoencoder", action="store_true", help="Use pre-trained Autoencoder for vision")
     parser.add_argument("--use-icm", action="store_true", help="Use Intrinsic Curiosity Module (ICM)")
+    parser.add_argument("--run-id", type=str, default="ppo_mario", help="Name/ID for this training run to avoid overwriting models")
     args = parser.parse_args()
 
     # Create directories if they don't exist
@@ -103,7 +104,7 @@ def main():
     mlflow.set_experiment("Mario_NDS_RL")
 
     # MLOps context
-    with mlflow.start_run():
+    with mlflow.start_run(run_name=args.run_id):
         # Log parameters
         mlflow.log_param("model_type", "PPO")
         mlflow.log_param("total_timesteps", args.timesteps)
@@ -158,13 +159,13 @@ def main():
             print("\nTreinamento interrompido pelo usuário! Salvando o progresso atual...")
 
         # Save Model locally (this runs whether it finishes naturally or is interrupted)
-        model_path = "models/ppo_mario"
         os.makedirs("models", exist_ok=True)
+        model_path = f"models/{args.run_id}"
         model.save(model_path)
+        print(f"Training complete and model saved to {model_path}.")
         
         # Register Model in MLflow
         mlflow.log_artifact(f"{model_path}.zip", artifact_path="models")
-        
         print("Training complete and model saved.")
 
 if __name__ == "__main__":
