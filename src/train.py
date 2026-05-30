@@ -3,6 +3,9 @@ import argparse
 import mlflow
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
+import torch
+import torch.nn as nn
 from env import MarioNdsEnv
 
 class MLflowCallback(BaseCallback):
@@ -26,6 +29,44 @@ class MLflowCallback(BaseCallback):
                 mlflow.log_metric("episode_length", info["episode"]["l"], step=self.num_timesteps)
         return True
 
+class CustomAutoencoderFeaturesExtractor(BaseFeaturesExtractor):
+    def __init__(self, observation_space, features_dim=512, model_path="models/autoencoder.pth"):
+        super().__init__(observation_space, features_dim)
+        
+        self.encoder = nn.Sequential(
+            nn.Conv2d(observation_space.shape[0], 32, kernel_size=8, stride=4, padding=0),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=0),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=0),
+            nn.ReLU(),
+            nn.Flatten(),
+            nn.Linear(3136, features_dim),
+            nn.ReLU()
+        )
+        
+        if os.path.exists(model_path):
+            print(f"Loading pre-trained Autoencoder weights from {model_path}...")
+            state_dict = torch.load(model_path, map_location="cpu")
+            encoder_state_dict = {k.replace('encoder.', ''): v for k, v in state_dict.items() if k.startswith('encoder.')}
+            
+            # Adapt 1-channel pre-trained weights to 4-channel FrameStack
+            if encoder_state_dict['0.weight'].shape[1] == 1 and observation_space.shape[0] == 4:
+                w = encoder_state_dict['0.weight']
+                encoder_state_dict['0.weight'] = w.repeat(1, 4, 1, 1) / 4.0
+                
+            self.encoder.load_state_dict(encoder_state_dict)
+            
+            # Freeze the convolutional layers
+            for param in self.encoder.parameters():
+                param.requires_grad = False
+            print("Autoencoder weights loaded and frozen!")
+        else:
+            print("Warning: Autoencoder weights not found. Using randomly initialized encoder.")
+
+    def forward(self, observations):
+        return self.encoder(observations)
+
 def make_env(rom_path, state_path, rank):
     def _init():
         from stable_baselines3.common.monitor import Monitor
@@ -42,6 +83,7 @@ def main():
     parser.add_argument("--test-run", action="store_true", help="Run a short test to verify environment")
     parser.add_argument("--resume", type=str, default=None, help="Path to existing model to resume training (e.g. models/ppo_mario)")
     parser.add_argument("--num-envs", type=int, default=4, help="Number of parallel environments to run")
+    parser.add_argument("--use-autoencoder", action="store_true", help="Use pre-trained Autoencoder for vision")
     args = parser.parse_args()
 
     # Create directories if they don't exist
@@ -71,11 +113,19 @@ def main():
 
         # Initialize or Load Model
         ent_coef_val = 0.05  # Increased entropy to force more exploration
+        
+        policy_kwargs = dict()
+        if args.use_autoencoder:
+            policy_kwargs = dict(
+                features_extractor_class=CustomAutoencoderFeaturesExtractor,
+                features_extractor_kwargs=dict(features_dim=512)
+            )
+            
         if args.resume and os.path.exists(f"{args.resume}.zip"):
             print(f"Resuming training from {args.resume}.zip...")
             model = PPO.load(args.resume, env=env, ent_coef=ent_coef_val)
         else:
-            model = PPO("CnnPolicy", env, verbose=1, ent_coef=ent_coef_val, tensorboard_log="./tensorboard_logs/")
+            model = PPO("CnnPolicy", env, verbose=1, ent_coef=ent_coef_val, tensorboard_log="./tensorboard_logs/", policy_kwargs=policy_kwargs)
         
         mlflow.log_param("learning_rate", model.learning_rate)
         mlflow.log_param("ent_coef", ent_coef_val)
