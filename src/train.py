@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 from env import MarioNdsEnv
 
+
 class MLflowCallback(BaseCallback):
     """
     Custom callback for logging to MLflow.
@@ -27,6 +28,9 @@ class MLflowCallback(BaseCallback):
                 # Log to MLflow
                 mlflow.log_metric("episode_reward", info["episode"]["r"], step=self.num_timesteps)
                 mlflow.log_metric("episode_length", info["episode"]["l"], step=self.num_timesteps)
+            if "intrinsic_reward" in info:
+                mlflow.log_metric("intrinsic_reward", info["intrinsic_reward"], step=self.num_timesteps)
+                mlflow.log_metric("extrinsic_reward", info["extrinsic_reward"], step=self.num_timesteps)
         return True
 
 class CustomAutoencoderFeaturesExtractor(BaseFeaturesExtractor):
@@ -84,6 +88,7 @@ def main():
     parser.add_argument("--resume", type=str, default=None, help="Path to existing model to resume training (e.g. models/ppo_mario)")
     parser.add_argument("--num-envs", type=int, default=4, help="Number of parallel environments to run")
     parser.add_argument("--use-autoencoder", action="store_true", help="Use pre-trained Autoencoder for vision")
+    parser.add_argument("--use-icm", action="store_true", help="Use Intrinsic Curiosity Module (ICM)")
     args = parser.parse_args()
 
     # Create directories if they don't exist
@@ -111,6 +116,11 @@ def main():
         env = SubprocVecEnv(env_fns) # Launch multiple emulators in parallel!
         env = VecFrameStack(env, n_stack=4) # Stack 4 frames so CNN can perceive motion
 
+        if args.use_icm:
+            from icm import ICMVecEnvWrapper
+            print("Wrapping environment with Intrinsic Curiosity Module (ICM)...")
+            env = ICMVecEnvWrapper(env)
+
         # Initialize or Load Model
         ent_coef_val = 0.05  # Increased entropy to force more exploration
         
@@ -129,6 +139,9 @@ def main():
         
         mlflow.log_param("learning_rate", model.learning_rate)
         mlflow.log_param("ent_coef", ent_coef_val)
+        mlflow.log_param("use_autoencoder", args.use_autoencoder)
+        mlflow.log_param("use_icm", args.use_icm)
+        mlflow.log_param("num_envs", args.num_envs)
         mlflow.log_param("n_steps", model.n_steps)
         mlflow.log_param("batch_size", model.batch_size)
 
