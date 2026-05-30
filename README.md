@@ -1,121 +1,112 @@
-# Mario NDS Reinforcement Learning 🍄🤖
+# Nintendo DS Reinforcement Learning Pipeline
 
-Este projeto treina um agente de Inteligência Artificial usando **Reinforcement Learning (PPO)** para jogar *New Super Mario Bros* de Nintendo DS. Diferente de projetos tradicionais de emuladores que leem diretamente a RAM do jogo, este projeto utiliza **Visão Computacional (Optical Flow e Subtração de Frames)** para deduzir a posição do Mario e calcular recompensas dinamicamente!
+Este projeto implementa um agente de Aprendizado por Reforço (Reinforcement Learning - PPO) projetado para iterar em ambientes simulados do Nintendo DS (especificamente *New Super Mario Bros*). A arquitetura contorna a necessidade de leitura direta de endereços de memória (RAM) através da aplicação de heurísticas de Visão Computacional para o rastreamento espacial do agente.
 
-Além disso, a arquitetura foi expandida para suportar pipelines de MLOps de estado da arte, incluindo **Aprendizado Não-Supervisionado (Autoencoders)** e **Curiosidade Intrínseca (ICM)**.
+O repositório foi projetado com foco em MLOps e suporta abordagens híbridas de aprendizado, integrando modelos Não-Supervisionados (Autoencoders) e de Motivação Intrínseca (ICM) para mitigação de recompensas esparsas e aceleração de convergência.
 
 ---
 
 ## 🛠 Pré-requisitos e Instalação
 
-Certifique-se de ter as seguintes bibliotecas instaladas (recomendável usar um ambiente virtual conda/venv):
+Recomenda-se a utilização de um ambiente virtual (conda/venv) para isolamento de dependências.
 
 ```bash
 pip install gymnasium stable-baselines3[extra] opencv-python py-desmume mlflow torch tqdm numpy
 ```
 
-> **Aviso:** O pacote `py-desmume` é essencial para inicializar o emulador do Nintendo DS internamente no Python.
+> **Aviso:** O pacote `py-desmume` é o wrapper que encapsula a engine de emulação do Nintendo DS. Sem ele, o ambiente limitará-se a comportamentos estáticos de fallback.
 
-### Estrutura de Pastas (Exigida)
-Certifique-se de que a ROM do jogo e o seu Savestate (logo no início da primeira fase) estão na pasta `data/`.
-- `data/mario.nds` (A ROM do Nintendo DS)
-- `data/state.dst` (O arquivo de Savestate para a IA sempre renascer no mesmo lugar)
+### Estrutura de Arquivos
+Posicione o binário da aplicação (ROM) e o snapshot de estado (Savestate) no diretório `data/`:
+- `data/mario.nds` (Imagem ROM)
+- `data/state.dst` (Savestate indicando o *frame* zero de inicialização do episódio)
 
 ---
 
-## 🚀 As 3 "Rotas" de Treinamento
+## 🔬 Metodologia de Recompensa Visual
 
-O projeto suporta 3 metodologias distintas de treinamento de IA. Você pode escolher qual ativar usando flags de comando.
+Para dispensar o acoplamento com endereços de memória voláteis do emulador, a função de recompensa (Reward Function) baseia-se em duas heurísticas de Visão Computacional operando sobre o tensor de imagens:
 
-### 1. Treinamento Clássico (RL Puro)
-Usa o algoritmo PPO padrão do Stable-Baselines3. A IA aprende a ver e jogar simultaneamente do zero.
+1. **Optical Flow Denso (Método de Farneback):** Calcula o vetor de deslocamento dos pixels do cenário de fundo (*background*). Quando a câmera acompanha o deslocamento do agente para a direita, o cenário move-se na direção oposta, fornecendo um gradiente escalar de avanço no eixo X. Utiliza-se a mediana direcional para isolar ruídos no primeiro plano.
+2. **Subtração de Frames Diferencial (AbsDiff):** Resolve o problema mecânico de "zonas mortas" da câmera, onde o agente se desloca na tela mas o cenário permanece estático. Emprega limiarização sobre a diferença de frames (`cv2.absdiff`) para isolar os pixels da entidade em movimento, computando a sua mediana geométrica e integrando esse deslocamento local ao deslocamento global da câmera.
+
+Esta fusão gera uma coordenada X sintética altamente precisa. Sua implementação eliminou cenários críticos de *Reward Hacking*, onde o agente minimizava a função objetivo acionando resets prematuros do episódio em virtude de falhas de captação na zona morta da câmera.
+
+---
+
+## 🚀 Arquiteturas de Treinamento
+
+O pipeline suporta três métodos, ativados via argumentos de CLI.
+
+### 1. Aprendizado por Reforço Base (PPO)
+A política (Policy Network) e as camadas de extração convolucionais (CNN) são otimizadas simultaneamente do zero utilizando unicamente o sinal de recompensa do ambiente (*Extrinsic Reward*).
 
 **Comando:**
 ```bash
 python src/train.py --rom "data/mario.nds" --state "data/state.dst" --timesteps 1000000 --num-envs 4
 ```
-*(O parâmetro `--num-envs 4` abre 4 emuladores em paralelo para acelerar a coleta de dados).*
+*(O parâmetro `--num-envs 4` inicializa subprocessos paralelos do emulador, descorrelacionando lotes de transição e maximizando a taxa de amostragem).*
 
 ---
 
-### 2. Visão Pré-treinada (Módulo Autoencoder)
-Nesta rota, nós primeiro ensinamos a IA a "enxergar" a física do jogo de forma não-supervisionada, antes de ensiná-la a apertar botões. O aprendizado fica muito mais rápido!
+### 2. Visão Computacional Pré-Treinada (Autoencoder)
+Para mitigar a ineficiência de amostragem (*Sample Inefficiency*) inerente ao processamento direto de tensores de imagem, emprega-se uma fase de Representational Learning.
 
-**Passo A: Coletar os Dados**
-```bash
-python src/collect_data.py --rom "data/mario.nds" --state "data/state.dst" --num-frames 10000
-```
-*(Isso gerará milhares de fotos aleatórias e salvará em um `.npz`)*
+* **Objetivo de Otimização:** O Autoencoder (CNN Encoder + CNN Decoder) ingere um conjunto de transições de imagem aleatórias. A função de perda (MSE) penaliza a assimetria entre a imagem de entrada e a imagem reconstruída após a passagem pelo gargalo dimensional (512 *features* latentes). Isso induz a rede a desenvolver de forma autônoma filtros de detecção de bordas, mapeamento de obstáculos e segmentação de entidades operantes, independente do sinal de recompensa final.
+* **Transferência de Pesos:** No treinamento subsequente do PPO, os tensores do Encoder são instanciados e sua computação de gradiente é congelada (`requires_grad=False`). O PPO otimiza estritamente os Perceptrons (FCN) da camada de ação, reduzindo ordens de magnitude na convergência da política.
 
-**Passo B: Treinar a Visão (Unsupervised)**
+**Pipeline de Execução:**
 ```bash
+# Geração de dataset via Random Policy
+python src/collect_data.py --num-frames 10000
+
+# Treinamento não-supervisionado do Autoencoder
 python src/train_autoencoder.py --dataset "../data/mario_dataset.npz" --epochs 20
-```
-*(O PyTorch criará o "cérebro visual" do Mario e o salvará em `models/autoencoder.pth`)*
 
-**Passo C: Treinar o Mario usando o Cérebro Visual**
-```bash
-python src/train.py --rom "data/mario.nds" --state "data/state.dst" --timesteps 1000000 --num-envs 4 --use-autoencoder
+# RL com pesos visuais transferidos
+python src/train.py --timesteps 1000000 --num-envs 4 --use-autoencoder
 ```
 
 ---
 
-### 3. Explorador Curioso (Módulo ICM)
-Nesta rota, o Mário recebe uma dose extra de **Dopamina e Curiosidade**. O Módulo ICM (Intrinsic Curiosity Module) avalia a surpresa da IA diante de cada imagem nova e dá pontos bônus para forçá-la a explorar buracos, canos e inimigos desconhecidos.
+### 3. Exploração via Curiosidade Intrínseca (Módulo ICM)
+Em ambientes de topologia complexa, a ausência prolongada de recompensas extrínsecas leva ao colapso do gradiente da política. O ICM mitiga isso formulando o ambiente como um problema de modelagem preditiva.
+
+* **Dinâmica do Módulo:** O ICM compõe-se de dois sub-modelos. O *Modelo Inverso* prediz qual ação causou a transição $S_t \rightarrow S_{t+1}$, forçando o extrator de features a modelar apenas elementos do cenário que são controláveis pela política. O *Modelo Direto* utiliza essas features filtradas para prever o estado $S_{t+1}$ subsequente dada uma ação $A_t$.
+* **Sinal de Recompensa Intrínseca:** O Erro Quadrático Médio da previsão do *Modelo Direto* é extraído e somado à recompensa escalar enviada ao PPO. Consequentemente, o agente é matematicamente incentivado a convergir para os espaços estocásticos de maior dificuldade preditiva, forçando sistematicamente a exploração ativa e a transposição de obstáculos.
 
 **Comando:**
 ```bash
-python src/train.py --rom "data/mario.nds" --state "data/state.dst" --timesteps 1000000 --num-envs 4 --use-icm
+python src/train.py --timesteps 1000000 --num-envs 4 --use-icm
 ```
 
 ---
 
-## 💾 Comandos Úteis e MLOps
+## 💾 Gestão de Experimentos (MLOps)
 
-### Nomear o Treinamento (Evitar Sobrescrita)
-Por padrão, o projeto salva o modelo como `ppo_mario.zip`. Se você for testar as 3 rotas, é essencial dar um nome para o seu treino para não apagar os outros. Use a flag `--run-id`:
+### Versionamento de Modelos (Run IDs)
+Para preservar o isolamento sináptico de arquiteturas iterativas, utilize a flag `--run-id`. Ela estabelece o nome do arquivo serializado e unifica os namespaces das métricas logadas.
 ```bash
-python src/train.py --run-id "mario_icm_v1" --use-icm
+python src/train.py --run-id "experimento_icm_alpha" --use-icm
 ```
-Isso salvará o modelo como `models/mario_icm_v1.zip` e colocará o mesmo nome nos gráficos do MLflow!
+*Output: `models/experimento_icm_alpha.zip`*
 
-### Continuar um Treino Parado (Resume)
-O projeto conta com salvamento gracioso. Se você apertar `Ctrl+C`, ele salva o modelo sem corromper. Para continuar o treino de onde parou (mantendo gráficos contínuos e taxas de aprendizado precisas):
+### Retomada Contínua de Otimização (Resume)
+O projeto aplica manipulação assíncrona sobre interrupções do SO (ex: `SIGINT`), assegurando a persistência do modelo em disco antes do encerramento da subrotina. Para restaurar o treinamento preservando o *global step counter* e a topologia de decaimento do otimizador:
 ```bash
-python src/train.py --rom "data/mario.nds" --state "data/state.dst" --timesteps 1000000 --resume "models/ppo_mario"
+python src/train.py --timesteps 1000000 --resume "models/experimento_icm_alpha"
 ```
 
-### Avaliar o Modelo Treinado (Ver a IA Jogando)
-Para abrir uma janela visual e assistir ao Mario jogando sem que os pesos neurais mudem:
+### Inferência e Avaliação Qualitativa
+Para carregar uma política parametrizada e renderizar os resultados inferenciais de forma determinística:
 ```bash
-python src/evaluate.py --rom "data/mario.nds" --state "data/state.dst" --model "models/ppo_mario.zip"
+python src/evaluate.py --model "models/experimento_icm_alpha.zip"
 ```
-> Dica: Se quiser ver a IA jogando de forma um pouco mais imprevisível e exploratória, adicione a flag `--stochastic` no final do comando.
+> Utilize o argumento paramétrico `--stochastic` caso o objetivo seja avaliar a exploração baseada na distribuição de probabilidade das *logits* e não na argmax pura.
 
-### Acompanhar Gráficos de Aprendizado (MLflow)
-Este projeto usa MLOps. Para ver os gráficos de recompensa, morte, duração do episódio e curiosidade em tempo real, abra um terminal e rode:
+### Observabilidade de Métricas
+O rastreamento de métricas como cross-entropy intrínseca, duração temporal do agente e retorno episódico acumulado é gerenciado centralmente pelo MLflow.
 ```bash
 mlflow ui
 ```
-Em seguida, acesse `http://localhost:5000` no seu navegador!
-
----
-
-## 📊 Comparativo de Performance das 3 Rotas
-
-Qual rota é a "melhor"? Depende do que você quer priorizar: velocidade do processador ou velocidade de aprendizado.
-
-| Rota | Velocidade do PC (FPS) | Eficiência de Aprendizado (Sample Efficiency) | Descrição |
-|---|---|---|---|
-| **1. RL Puro** | 🚀🚀🚀 (Muito Rápido) | 🐢 (Lento) | O PC roda rápido, mas a IA demora para aprender o que é um inimigo. |
-| **2. Autoencoder** | 🚀🚀 (Rápido) | 🧠🧠🧠 (Mestre Rápido) | O melhor custo-benefício. O custo no PC é quase igual à Rota 1, mas o Mario aprende incrivelmente rápido pois sua "visão" já está calibrada. |
-| **3. Módulo ICM** | 🐢 (Muito Lento) | 🧠🧠 (Muito Bom) | A curiosidade resolve quebra-cabeças complexos rapidamente, mas rodar 3 redes neurais ao mesmo tempo sacrifica o FPS do seu processador. |
-
----
-
-## 🧠 Curiosidades de IA (Reward Hacking)
-Um dos maiores desafios resolvidos neste projeto foi o **Reward Hacking**. Como o emulador de DS possui uma "Zona Morta" de câmera (a câmera não acompanha o Mario nos primeiros passos da fase), o Optical Flow clássico punia a IA por andar para frente. 
-
-A IA aprendeu a hackear o sistema: ela pulava no frame 0 (para causar um solavanco de pontuação falsa na câmera) e cometia suicídio no Goomba o mais rápido possível para resetar a fase e farmar pontos infinitamente!
-
-**A Solução:** O projeto agora utiliza um rastreador de centro de massa `cv2.absdiff` em conjunto com o Optical Flow `np.median` para calcular um **X Universal**. O suicídio não é mais a opção matematicamente perfeita.
+O console emitirá a porta de alocação padrão (comumente `http://localhost:5000`) para acesso ao dashboard interativo.
