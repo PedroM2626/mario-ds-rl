@@ -138,7 +138,9 @@ def main():
         
         # Train Model with graceful interruption
         try:
-            model.learn(total_timesteps=timesteps, callback=MLflowCallback())
+            # If resuming, we tell SB3 NOT to reset the global step counter and learning rate schedule
+            reset_ts = False if args.resume else True
+            model.learn(total_timesteps=timesteps, callback=MLflowCallback(), reset_num_timesteps=reset_ts)
         except KeyboardInterrupt:
             print("\nTreinamento interrompido pelo usuário! Salvando o progresso atual...")
 
