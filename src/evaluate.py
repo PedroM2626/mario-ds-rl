@@ -6,8 +6,8 @@ from env import MarioNdsEnv
 def main():
     parser = argparse.ArgumentParser(description="Evaluate Mario RL Agent")
     parser.add_argument("--model", type=str, default="models/ppo_mario.zip", help="Path to trained model")
-    parser.add_argument("--rom", type=str, default="data/mario.nds", help="Path to NDS ROM")
-    parser.add_argument("--state", type=str, default="data/state.dst", help="Path to Savestate")
+    parser.add_argument("--rom", type=str, default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).nds", help="Path to NDS ROM")
+    parser.add_argument("--state", type=str, default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).ds1", help="Path to Savestate")
     parser.add_argument("--episodes", type=int, default=5, help="Number of episodes to evaluate")
     parser.add_argument("--stochastic", action="store_true", help="Evaluate stochastically (useful to see untrained models mash buttons)")
     parser.add_argument("--use-autoencoder", action="store_true", help="Use pre-trained Autoencoder for vision")
