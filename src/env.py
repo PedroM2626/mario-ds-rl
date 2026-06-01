@@ -53,7 +53,6 @@ class MarioNdsEnv(gym.Env):
             self.has_emulator = False
 
         # Define action space
-        # Ações restauradas para o controle total do Mario
         # Actions: 0: Noop, 1: Right, 2: Right+Dash(B), 3: Right+Dash+Jump(B+A), 4: Left, 5: Jump(A)
         self.action_space = spaces.Discrete(6)
         
@@ -67,7 +66,7 @@ class MarioNdsEnv(gym.Env):
         self.accumulated_camera_x = 0.0
         self.last_mario_screen_x = 10.0
         self.current_x = 0
-        self.frameskip = 6 # Aumentado de 4 para 6
+        self.frameskip = 8 # Aumentado de 6 para 8 conforme requisitado
 
     def _get_obs(self):
         if not self.has_emulator:
@@ -208,7 +207,7 @@ class MarioNdsEnv(gym.Env):
             
             if black_match_ratio > 0.90:  # 90% of the mask matches
                 done = True
-                reward -= 30.0  
+                reward -= 50.0  
                 print("Death detected!")
                 
         info = self._get_info()

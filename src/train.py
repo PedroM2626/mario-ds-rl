@@ -108,7 +108,7 @@ def main():
         # Log parameters
         mlflow.log_param("model_type", "PPO")
         mlflow.log_param("total_timesteps", args.timesteps)
-        mlflow.log_param("frameskip", 6)
+        mlflow.log_param("frameskip", 8)
         
         # Create parallel environments
         from stable_baselines3.common.vec_env import SubprocVecEnv, VecFrameStack
@@ -123,7 +123,7 @@ def main():
             env = ICMVecEnvWrapper(env)
 
         # Initialize or Load Model
-        ent_coef_val = 0.05  # Increased entropy to force more exploration
+        ent_coef_val = 0.1  # Increased entropy to force MORE exploration
         
         policy_kwargs = dict()
         if args.use_autoencoder:
