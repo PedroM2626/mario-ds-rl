@@ -10,8 +10,8 @@ class ICMModel(nn.Module):
         super(ICMModel, self).__init__()
         self.num_actions = num_actions
         
-        # We expect obs_shape to be (4, 84, 84) if VecFrameStack is used
-        in_channels = obs_shape[0]
+        # We expect obs_shape to be (84, 84, 4) if VecFrameStack is used (channels last)
+        in_channels = obs_shape[-1]
         
         # Feature Extractor
         self.feature_extractor = nn.Sequential(
@@ -89,9 +89,12 @@ class ICMVecEnvWrapper(VecEnvWrapper):
         obs, rewards, dones, infos = self.venv.step_wait()
         
         # Process ICM
-        # Normalize obs
+        # Normalize obs and permute to (B, C, H, W) for PyTorch Conv2D
         state_tensor = torch.FloatTensor(self.prev_obs).to(self.device) / 255.0
+        state_tensor = state_tensor.permute(0, 3, 1, 2)
+        
         next_state_tensor = torch.FloatTensor(obs).to(self.device) / 255.0
+        next_state_tensor = next_state_tensor.permute(0, 3, 1, 2)
         
         actions_tensor = torch.LongTensor(self.last_actions).to(self.device)
         action_one_hot = F.one_hot(actions_tensor, num_classes=self.action_space.n).float()

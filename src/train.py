@@ -81,8 +81,8 @@ def make_env(rom_path, state_path, rank):
 
 def main():
     parser = argparse.ArgumentParser(description="Train Mario RL Agent")
-    parser.add_argument("--rom", type=str, default="../data/mario.nds", help="Path to NDS ROM")
-    parser.add_argument("--state", type=str, default="../data/state.dst", help="Path to Savestate")
+    parser.add_argument("--rom", type=str, default="data/mario.nds", help="Path to NDS ROM")
+    parser.add_argument("--state", type=str, default="data/state.dst", help="Path to Savestate")
     parser.add_argument("--timesteps", type=int, default=100000, help="Total timesteps to train")
     parser.add_argument("--test-run", action="store_true", help="Run a short test to verify environment")
     parser.add_argument("--resume", type=str, default=None, help="Path to existing model to resume training (e.g. models/ppo_mario)")
