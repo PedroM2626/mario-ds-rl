@@ -90,6 +90,8 @@ def main():
     parser.add_argument("--use-autoencoder", action="store_true", help="Use pre-trained Autoencoder for vision")
     parser.add_argument("--use-icm", action="store_true", help="Use Intrinsic Curiosity Module (ICM)")
     parser.add_argument("--run-id", type=str, default="ppo_mario", help="Name/ID for this training run to avoid overwriting models")
+    parser.add_argument("--n-steps", type=int, default=256, help="Number of PPO steps per rollout")
+    parser.add_argument("--lr", type=float, default=0.0005, help="Learning rate for PPO training")
     args = parser.parse_args()
 
     # Create directories if they don't exist
@@ -124,6 +126,8 @@ def main():
 
         # Initialize or Load Model
         ent_coef_val = 0.1  # Increased entropy to force MORE exploration
+        n_steps_val = args.n_steps
+        lr_val = args.lr
         
         policy_kwargs = dict()
         if args.use_autoencoder:
@@ -133,10 +137,10 @@ def main():
             )
             
         if args.resume and os.path.exists(f"{args.resume}.zip"):
-            print(f"Resuming training from {args.resume}.zip...")
-            model = PPO.load(args.resume, env=env, ent_coef=ent_coef_val)
+            print(f"Resuming training from {args.resume}.zip (Overriding n_steps={n_steps_val}, lr={lr_val})...")
+            model = PPO.load(args.resume, env=env, ent_coef=ent_coef_val, n_steps=n_steps_val, learning_rate=lr_val)
         else:
-            model = PPO("CnnPolicy", env, verbose=1, ent_coef=ent_coef_val, tensorboard_log="./tensorboard_logs/", policy_kwargs=policy_kwargs)
+            model = PPO("CnnPolicy", env, verbose=1, ent_coef=ent_coef_val, n_steps=n_steps_val, learning_rate=lr_val, tensorboard_log="./tensorboard_logs/", policy_kwargs=policy_kwargs)
         
         mlflow.log_param("learning_rate", model.learning_rate)
         mlflow.log_param("ent_coef", ent_coef_val)
