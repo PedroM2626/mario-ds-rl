@@ -92,6 +92,7 @@ def main():
     parser.add_argument("--run-id", type=str, default="ppo_mario", help="Name/ID for this training run to avoid overwriting models")
     parser.add_argument("--n-steps", type=int, default=256, help="Number of PPO steps per rollout")
     parser.add_argument("--lr", type=float, default=0.0005, help="Learning rate for PPO training")
+    parser.add_argument("--ent-coef", type=float, default=0.01, help="Entropy coefficient for PPO")
     args = parser.parse_args()
 
     # Create directories if they don't exist
@@ -125,7 +126,7 @@ def main():
             env = ICMVecEnvWrapper(env)
 
         # Initialize or Load Model
-        ent_coef_val = 0.1  # Increased entropy to force MORE exploration
+        ent_coef_val = args.ent_coef
         n_steps_val = args.n_steps
         lr_val = args.lr
         
