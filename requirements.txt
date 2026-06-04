@@ -2,7 +2,10 @@ py-desmume==0.0.3
 gymnasium==0.29.1
 stable-baselines3[extra]==2.2.1
 mlflow==2.11.1
-opencv-python==4.9.0.80
-numpy==1.26.4
-torch==2.2.1
+opencv-python==4.13.0.92
+numpy==2.2.6
+torch==2.6.0+cu124
+torchvision==0.21.0+cu124
 tensorboard==2.16.2
+sheeprl==0.5.7
+setuptools==80.10.2

@@ -82,6 +82,41 @@ python src/train.py --timesteps 1000000 --num-envs 4 --use-icm
 
 ---
 
+### 4. Redes Residuais Convolucionais (ImpalaCNN)
+Para otimizar o aprendizado de representações visuais profundas e melhorar a generalização espacial do agente, o pipeline inclui suporte à arquitetura residual **ImpalaCNN** (composta de blocos ResNet alternados com sub-amostragens e camadas convolucionais densas).
+
+Essa arquitetura customizada (`src/impala_cnn.py`) substitui a clássica `NatureCNN` da biblioteca Stable-Baselines3, obtendo maior estabilidade e consistência de navegação sob políticas estocásticas (atingindo 80% de taxa de sucesso na superação de inimigos iniciais com 1M de passos).
+
+**Comando de Treinamento:**
+```bash
+python src/train_impala.py --run-id "mario_impala" --timesteps 1000000 --num-envs 6 --n-steps 1376 --lr 0.0003 --ent-coef 0.01
+```
+
+**Comando de Avaliação:**
+```bash
+python src/evaluate.py --model "models/mario_impala.zip" --stochastic
+```
+---
+
+### 5. Algoritmo Model-Based com World Models (DreamerV3)
+Para acelerar drasticamente a eficiência de amostragem (Sample Efficiency) e viabilizar planejamento espacial latente, o projeto suporta o algoritmo **DreamerV3** através da biblioteca **SheepRL** (baseada no Lightning Fabric).
+
+* **Funcionamento:** O DreamerV3 treina um Modelo de Mundo Recorrente (RSSM) composto por um Encoder, Decoder, Modelo de Transição e Modelo de Recompensa. O agente (Actor-Critic) é otimizado inteiramente na "imaginação" (rollouts latentes simulados pelo World Model), reduzindo a quantidade de passos de física reais exigidos do emulador.
+* **Aceleração GPU:** O pipeline foi atualizado para suporte completo à GPU (CUDA 12.x), permitindo compilação e treinamento eficientes. Para evitar estouros de disco no memmap padrão da SheepRL, otimizamos o buffer para rodar diretamente na memória RAM (`buffer.memmap=false`) com limite de 100.000 transições.
+
+**Comando de Treinamento (GPU):**
+```bash
+python src/train_dreamer.py
+```
+*Este script inicializa a distribuição do Fabric e registra dinamicamente o wrapper do Gymnasium (`MarioNDS-Dreamer-v0`) com transposição de canais para formato de imagem compatível com PyTorch (`1, 84, 84`).*
+
+**Monitoramento de Métricas (TensorBoard):**
+```bash
+tensorboard --logdir logs/runs/dreamer_v3
+```
+
+---
+
 ## 💾 Gestão de Experimentos (MLOps)
 
 ### Versionamento de Modelos (Run IDs)
