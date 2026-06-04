@@ -1,5 +1,17 @@
 import sys
 import os
+import torch
+
+# Monkey-patch torch.load to default weights_only=False for PyTorch 2.6 compatibility.
+# In PyTorch 2.6, weights_only defaults to True, which raises exceptions when loading
+# custom serialized classes like SheepRL's ReplayBuffer from checkpoints.
+original_load = torch.load
+def custom_load(*args, **kwargs):
+    if "weights_only" not in kwargs:
+        kwargs["weights_only"] = False
+    return original_load(*args, **kwargs)
+torch.load = custom_load
+print("Applied PyTorch 2.6 compatibility patch (weights_only=False by default)")
 
 # Append the directory containing this script to sys.path
 # to ensure python can import local modules
@@ -25,7 +37,8 @@ if __name__ == "__main__":
             "fabric.accelerator=cuda",
             "fabric.devices=1",
             "algo.total_steps=500000",
-            "checkpoint.every=50000",
+            # Save checkpoints every 1000 steps (~15 minutes of training) as requested by user
+            "checkpoint.every=1000",
             # Optimize replay buffer for machines with limited disk space
             # DreamerV3 defaults to 1,000,000 steps which takes ~7GB of disk memmap space
             "buffer.size=100000",
