@@ -1,5 +1,13 @@
 import argparse
 import time
+import sys
+# Ensure src is in path for custom imports
+sys.path.append("src")
+try:
+    from impala_cnn import ImpalaCNNFeaturesExtractor
+except ImportError:
+    pass
+
 from stable_baselines3 import PPO
 from env import MarioNdsEnv
 
