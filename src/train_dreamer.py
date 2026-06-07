@@ -26,24 +26,44 @@ import sheeprl_env
 from sheeprl.cli import run
 
 if __name__ == "__main__":
-    # If the script is run without arguments, set the default parameters for DreamerV3 training
-    if len(sys.argv) == 1:
-        sys.argv = [
-            sys.argv[0],
-            "exp=dreamer_v3",
-            "env=gym",
-            "env.id=MarioNDS-Dreamer-v0",
-            "env.num_envs=1",
-            "fabric.accelerator=cuda",
-            "fabric.devices=1",
-            "algo.total_steps=500000",
-            # Save checkpoints every 1000 steps (~15 minutes of training) as requested by user
-            "checkpoint.every=1000",
-            # Optimize replay buffer for machines with limited disk space
-            # DreamerV3 defaults to 1,000,000 steps which takes ~7GB of disk memmap space
-            "buffer.size=100000",
-            "buffer.memmap=false", # Keep buffer in RAM to avoid disk full errors (Errno 28)
-        ]
+    defaults = {
+        "exp": "dreamer_v3",
+        "env": "gym",
+        "env.id": "MarioNDS-Dreamer-v0",
+        "env.num_envs": "1",
+        "fabric.accelerator": "cuda",
+        "fabric.devices": "1",
+        "algo.total_steps": "500000",
+        "checkpoint.every": "1000",
+        "buffer.size": "100000",
+        "buffer.memmap": "false",
+        "buffer.checkpoint": "false",
+        "env.capture_video": "false",
+    }
+    
+    # Parse existing arguments
+    args_dict = {}
+    for arg in sys.argv[1:]:
+        if "=" in arg:
+            k, v = arg.split("=", 1)
+            args_dict[k] = v
+        else:
+            args_dict[arg] = None
+            
+    # Merge defaults
+    for k, v in defaults.items():
+        if k not in args_dict:
+            args_dict[k] = v
+            
+    # Reconstruct sys.argv
+    new_args = [sys.argv[0]]
+    for k, v in args_dict.items():
+        if v is not None:
+            new_args.append(f"{k}={v}")
+        else:
+            new_args.append(k)
+            
+    sys.argv = new_args
         
     print(f"Starting SheepRL DreamerV3 training with args: {sys.argv[1:]}")
     

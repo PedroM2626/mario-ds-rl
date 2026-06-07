@@ -207,7 +207,7 @@ class MarioNdsEnv(gym.Env):
             
             if black_match_ratio > 0.90:  # 90% of the mask matches
                 done = True
-                reward -= 50.0  
+                reward -= 15.0  
                 print("Death detected!")
                 
         info = self._get_info()

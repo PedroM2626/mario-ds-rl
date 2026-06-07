@@ -45,7 +45,9 @@ def create_mario_dreamer_env(**kwargs):
     rom_path = os.path.join(base_dir, "data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).nds")
     state_path = os.path.join(base_dir, "data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).ds1")
     
-    render_mode = kwargs.get("render_mode", None)
+    # Allow overriding render_mode via environment variable for real-time visualization
+    render_mode = os.getenv("MARIO_RENDER_MODE", kwargs.get("render_mode", None))
+    print(f"Initializing SheepRLMarioWrapper with render_mode: {render_mode}")
     raw_env = MarioNdsEnv(rom_path=rom_path, state_path=state_path, render_mode=render_mode)
     return SheepRLMarioWrapper(raw_env)
 
