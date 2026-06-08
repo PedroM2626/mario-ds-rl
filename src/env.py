@@ -42,6 +42,24 @@ class MarioNdsEnv(gym.Env):
                 self.death_mask = (d_resized < 10)
                 print("Loaded death.png mask for Game Over detection.")
         
+        # Load finish and timeout templates for ORB matching
+        self.orb = cv2.ORB_create(nfeatures=200)
+        self.bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+        
+        finish_img_path = os.path.abspath(os.path.join(os.path.dirname(self.rom_path), '../images/finish.png'))
+        if os.path.exists(finish_img_path):
+            f_img = cv2.imread(finish_img_path, cv2.IMREAD_GRAYSCALE)
+            if f_img is not None:
+                _, self.des_finish = self.orb.detectAndCompute(f_img, None)
+                print("Loaded finish.png template.")
+                
+        timeout_img_path = os.path.abspath(os.path.join(os.path.dirname(self.rom_path), '../images/timeout.png'))
+        if os.path.exists(timeout_img_path):
+            t_img = cv2.imread(timeout_img_path, cv2.IMREAD_GRAYSCALE)
+            if t_img is not None:
+                _, self.des_timeout = self.orb.detectAndCompute(t_img, None)
+                print("Loaded timeout.png template.")
+        
         # Initialize Emulator
         try:
             self.emu = DeSmuME()
@@ -80,6 +98,7 @@ class MarioNdsEnv(gym.Env):
             
             # Convert to grayscale and resize
             gray = cv2.cvtColor(top_screen, cv2.COLOR_RGB2GRAY)
+            self.last_top_screen_gray = gray.copy()
             resized = cv2.resize(gray, (84, 84), interpolation=cv2.INTER_AREA)
             
             # Optical Flow reward calculation: track the background scrolling
@@ -192,12 +211,7 @@ class MarioNdsEnv(gym.Env):
         done = False 
         truncated = False
         
-        # Add timeout to prevent infinite standing still episodes
-        # 1 step = 6 frames. 60 frames = 1 sec. 1 step = 1/10 sec.
-        # 2m50s = 170 segundos. 170 * 10 = 1700 steps.
         self.episode_steps += 1
-        if self.episode_steps >= 1700:
-            truncated = True
         
         if self.death_mask is not None:
             # Check if the current observation matches the black Bowser silhouette
@@ -210,7 +224,32 @@ class MarioNdsEnv(gym.Env):
                 reward -= 15.0  
                 print("Death detected!")
                 
+        # ORB matching for finish and timeout
+        if hasattr(self, 'last_top_screen_gray') and self.last_top_screen_gray is not None:
+            _, des_obs = self.orb.detectAndCompute(self.last_top_screen_gray, None)
+            if des_obs is not None:
+                # Check finish
+                if not done and hasattr(self, 'des_finish') and self.des_finish is not None:
+                    matches = self.bf.match(self.des_finish, des_obs)
+                    good = [m for m in matches if m.distance < 50]
+                    if len(good) > 20:
+                        done = True
+                        reward += 100.0
+                        print("Finish detected!")
+                        
+                # Check timeout
+                if not done and hasattr(self, 'des_timeout') and self.des_timeout is not None:
+                    matches = self.bf.match(self.des_timeout, des_obs)
+                    good = [m for m in matches if m.distance < 50]
+                    if len(good) > 20:
+                        done = True
+                        reward -= 50.0
+                        print("Timeout detected!")
+                
         info = self._get_info()
+        
+        if self.render_mode == 'human':
+            self.render()
 
         return obs, reward, done, truncated, info
 
