@@ -113,11 +113,11 @@ def main():
         mlflow.log_param("total_timesteps", args.timesteps)
         mlflow.log_param("frameskip", 8)
         
-        # Create parallel environments
-        from stable_baselines3.common.vec_env import SubprocVecEnv
+        # Create sequential environments to save MASSIVE amounts of RAM
+        from stable_baselines3.common.vec_env import DummyVecEnv
         
         env_fns = [make_env(args.rom, args.state, i) for i in range(args.num_envs)]
-        env = SubprocVecEnv(env_fns) # Launch multiple emulators in parallel!
+        env = DummyVecEnv(env_fns) # Runs sequentially in the same process
         # Sem Frame Stacking: Recurrent PPO já possui LSTM que cuida da dimensão temporal
         # Recebe 1 frame (Canal de Cor: Grayscale) por vez.
 
