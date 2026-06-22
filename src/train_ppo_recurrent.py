@@ -1,85 +1,100 @@
+import multiprocessing
 import os
+
+# Disable CUDA for child processes to prevent them from taking up VRAM
+if multiprocessing.current_process().name != 'MainProcess':
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
 import argparse
-import mlflow
-from sb3_contrib import RecurrentPPO
-from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
-from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
-import torch
-import torch.nn as nn
 from env import MarioNdsEnv
 
 
-class MLflowCallback(BaseCallback):
-    """
-    Custom callback for logging to MLflow.
-    """
-    def __init__(self, verbose=0):
-        super().__init__(verbose)
-        self.episode_rewards = []
-        self.episode_lengths = []
-
-    def _on_step(self) -> bool:
-        # If the environment is vectorized, check infos for episode data
-        for info in self.locals.get("infos", []):
-            if "episode" in info:
-                self.episode_rewards.append(info["episode"]["r"])
-                self.episode_lengths.append(info["episode"]["l"])
-                
-                # Log to MLflow
-                mlflow.log_metric("episode_reward", info["episode"]["r"], step=self.num_timesteps)
-                mlflow.log_metric("episode_length", info["episode"]["l"], step=self.num_timesteps)
-            if "intrinsic_reward" in info:
-                mlflow.log_metric("intrinsic_reward", info["intrinsic_reward"], step=self.num_timesteps)
-                mlflow.log_metric("extrinsic_reward", info["extrinsic_reward"], step=self.num_timesteps)
-        return True
-
-class CustomAutoencoderFeaturesExtractor(BaseFeaturesExtractor):
-    def __init__(self, observation_space, features_dim=512, model_path="models/autoencoder.pth"):
-        super().__init__(observation_space, features_dim)
-        
-        self.encoder = nn.Sequential(
-            nn.Conv2d(observation_space.shape[0], 32, kernel_size=8, stride=4, padding=0),
-            nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=0),
-            nn.ReLU(),
-            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=0),
-            nn.ReLU(),
-            nn.Flatten(),
-            nn.Linear(3136, features_dim),
-            nn.ReLU()
-        )
-        
-        if os.path.exists(model_path):
-            print(f"Loading pre-trained Autoencoder weights from {model_path}...")
-            state_dict = torch.load(model_path, map_location="cpu")
-            encoder_state_dict = {k.replace('encoder.', ''): v for k, v in state_dict.items() if k.startswith('encoder.')}
-            
-            # Adapt 1-channel pre-trained weights if needed
-            if encoder_state_dict['0.weight'].shape[1] == 1 and observation_space.shape[0] != 1:
-                w = encoder_state_dict['0.weight']
-                encoder_state_dict['0.weight'] = w.repeat(1, observation_space.shape[0], 1, 1) / observation_space.shape[0]
-                
-            self.encoder.load_state_dict(encoder_state_dict)
-            
-            # Freeze the convolutional layers
-            for param in self.encoder.parameters():
-                param.requires_grad = False
-            print("Autoencoder weights loaded and frozen!")
-        else:
-            print("Warning: Autoencoder weights not found. Using randomly initialized encoder.")
-
-    def forward(self, observations):
-        return self.encoder(observations)
-
 def make_env(rom_path, state_path, rank):
     def _init():
+        import os
+        # Disable CUDA for child processes to save VRAM and prevent CUDA OOM
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""
+        import time
         from stable_baselines3.common.monitor import Monitor
+        # Stagger environment initialization to prevent file locking/sharing issues
+        time.sleep(rank * 1.5)
+        print(f"[Env {rank}] Starting initialization...")
         env = MarioNdsEnv(rom_path=rom_path, state_path=state_path)
         env = Monitor(env)
+        print(f"[Env {rank}] Initialization complete!")
         return env
     return _init
 
 def main():
+    import mlflow
+    from sb3_contrib import RecurrentPPO
+    from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
+    from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
+    import torch
+    import torch.nn as nn
+
+    class MLflowCallback(BaseCallback):
+        """
+        Custom callback for logging to MLflow.
+        """
+        def __init__(self, verbose=0):
+            super().__init__(verbose)
+            self.episode_rewards = []
+            self.episode_lengths = []
+
+        def _on_step(self) -> bool:
+            # If the environment is vectorized, check infos for episode data
+            for info in self.locals.get("infos", []):
+                if "episode" in info:
+                    self.episode_rewards.append(info["episode"]["r"])
+                    self.episode_lengths.append(info["episode"]["l"])
+                    
+                    # Log to MLflow
+                    mlflow.log_metric("episode_reward", info["episode"]["r"], step=self.num_timesteps)
+                    mlflow.log_metric("episode_length", info["episode"]["l"], step=self.num_timesteps)
+                if "intrinsic_reward" in info:
+                    mlflow.log_metric("intrinsic_reward", info["intrinsic_reward"], step=self.num_timesteps)
+                    mlflow.log_metric("extrinsic_reward", info["extrinsic_reward"], step=self.num_timesteps)
+            return True
+
+    class CustomAutoencoderFeaturesExtractor(BaseFeaturesExtractor):
+        def __init__(self, observation_space, features_dim=512, model_path="models/autoencoder.pth"):
+            super().__init__(observation_space, features_dim)
+            
+            self.encoder = nn.Sequential(
+                nn.Conv2d(observation_space.shape[0], 32, kernel_size=8, stride=4, padding=0),
+                nn.ReLU(),
+                nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=0),
+                nn.ReLU(),
+                nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=0),
+                nn.ReLU(),
+                nn.Flatten(),
+                nn.Linear(3136, features_dim),
+                nn.ReLU()
+            )
+            
+            if os.path.exists(model_path):
+                print(f"Loading pre-trained Autoencoder weights from {model_path}...")
+                state_dict = torch.load(model_path, map_location="cpu")
+                encoder_state_dict = {k.replace('encoder.', ''): v for k, v in state_dict.items() if k.startswith('encoder.')}
+                
+                # Adapt 1-channel pre-trained weights if needed
+                if encoder_state_dict['0.weight'].shape[1] == 1 and observation_space.shape[0] != 1:
+                    w = encoder_state_dict['0.weight']
+                    encoder_state_dict['0.weight'] = w.repeat(1, observation_space.shape[0], 1, 1) / observation_space.shape[0]
+                    
+                self.encoder.load_state_dict(encoder_state_dict)
+                
+                # Freeze the convolutional layers
+                for param in self.encoder.parameters():
+                    param.requires_grad = False
+                print("Autoencoder weights loaded and frozen!")
+            else:
+                print("Warning: Autoencoder weights not found. Using randomly initialized encoder.")
+
+        def forward(self, observations):
+            return self.encoder(observations)
+
     parser = argparse.ArgumentParser(description="Train Mario RL Agent with Recurrent PPO (LSTM)")
     parser.add_argument("--rom", type=str, default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).nds", help="Path to NDS ROM")
     parser.add_argument("--state", type=str, default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).ds1", help="Path to Savestate")
@@ -113,11 +128,16 @@ def main():
         mlflow.log_param("total_timesteps", args.timesteps)
         mlflow.log_param("frameskip", 8)
         
-        # Create sequential environments to save MASSIVE amounts of RAM
-        from stable_baselines3.common.vec_env import DummyVecEnv
+        # Create parallel environments via SubprocVecEnv if num_envs > 1 to speed up training
+        from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
         
         env_fns = [make_env(args.rom, args.state, i) for i in range(args.num_envs)]
-        env = DummyVecEnv(env_fns) # Runs sequentially in the same process
+        if args.num_envs > 1:
+            print(f"Initializing {args.num_envs} parallel environments via SubprocVecEnv...")
+            env = SubprocVecEnv(env_fns)
+        else:
+            print("Initializing 1 environment via DummyVecEnv...")
+            env = DummyVecEnv(env_fns)
         # Sem Frame Stacking: Recurrent PPO já possui LSTM que cuida da dimensão temporal
         # Recebe 1 frame (Canal de Cor: Grayscale) por vez.
 
@@ -175,6 +195,9 @@ def main():
             model.learn(total_timesteps=timesteps, callback=[MLflowCallback(), checkpoint_callback], reset_num_timesteps=reset_ts)
         except KeyboardInterrupt:
             print("\nTreinamento interrompido pelo usuário! Salvando o progresso atual...")
+        finally:
+            print("Closing environments...")
+            env.close()
 
         # Save Model locally (this runs whether it finishes naturally or is interrupted)
         os.makedirs("models", exist_ok=True)

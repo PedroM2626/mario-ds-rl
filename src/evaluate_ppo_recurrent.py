@@ -13,7 +13,7 @@ from env import MarioNdsEnv
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate Mario RL Agent with Recurrent PPO")
-    parser.add_argument("--model", type=str, default="models/checkpoints/recurrent_ppo_mario_390000_steps.zip", help="Path to trained model")
+    parser.add_argument("--model", type=str, default="models/checkpoints/recurrent_ppo_mario_660000_steps.zip", help="Path to trained model")
     parser.add_argument("--rom", type=str, default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).nds", help="Path to NDS ROM")
     parser.add_argument("--state", type=str, default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).ds1", help="Path to Savestate")
     parser.add_argument("--episodes", type=int, default=5, help="Number of episodes to evaluate")
