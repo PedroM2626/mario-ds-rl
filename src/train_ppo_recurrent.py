@@ -98,6 +98,22 @@ def main():
         def forward(self, observations):
             return self.encoder(observations)
 
+    class DrQFeaturesExtractorWrapper(BaseFeaturesExtractor):
+        """
+        Features extractor wrapper that applies DrQ-style random shifts data augmentation
+        to the inputs during training (when self.training is True).
+        """
+        def __init__(self, base_extractor, pad=4):
+            super().__init__(base_extractor.observation_space, base_extractor.features_dim)
+            self.base_extractor = base_extractor
+            self.pad = pad
+            
+        def forward(self, observations):
+            if self.training:
+                from curl import random_crop
+                observations = random_crop(observations, out_size=84, padding=self.pad)
+            return self.base_extractor(observations)
+
     parser = argparse.ArgumentParser(description="Train Mario RL Agent with Recurrent PPO (LSTM)")
     parser.add_argument("--rom", type=str, default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).nds", help="Path to NDS ROM")
     parser.add_argument("--state", type=str, default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).ds1", help="Path to Savestate")
@@ -113,6 +129,21 @@ def main():
     parser.add_argument("--curl-batch-size", type=int, default=64, help="Batch size for CURL contrastive learning")
     parser.add_argument("--curl-epochs", type=int, default=5, help="Number of CURL epochs per rollout")
     parser.add_argument("--unfreeze-encoder", action="store_true", help="Do not freeze encoder weights if using pre-trained weights")
+    # SPR Parameters
+    parser.add_argument("--use-spr", action="store_true", help="Use SPR representation learning callback")
+    parser.add_argument("--spr-lr", type=float, default=0.0001, help="Learning rate for SPR optimizer")
+    parser.add_argument("--spr-batch-size", type=int, default=64, help="Batch size for SPR contrastive learning")
+    parser.add_argument("--spr-epochs", type=int, default=5, help="Number of SPR epochs per rollout")
+    parser.add_argument("--spr-k-steps", type=int, default=3, help="Number of future transition rollout steps in SPR")
+    
+    # DrQ Parameters
+    parser.add_argument("--use-drq", action="store_true", help="Use DrQ-style random shifts data augmentation")
+    
+    # Policy Recurrence Parameters
+    parser.add_argument("--policy-type", type=str, default="lstm", choices=["lstm", "transformer"], help="Type of recurrent policy architecture")
+    parser.add_argument("--transformer-context", type=int, default=16, help="Context sequence length for Causal Transformer")
+    parser.add_argument("--transformer-nhead", type=int, default=8, help="Number of attention heads in Causal Transformer")
+    
     parser.add_argument("--run-id", type=str, default="recurrent_ppo_mario", help="Name/ID for this training run to avoid overwriting models")
     parser.add_argument("--n-steps", type=int, default=256, help="Number of PPO steps per rollout")
     parser.add_argument("--lr", type=float, default=0.0005, help="Learning rate for PPO training")
@@ -175,15 +206,38 @@ def main():
                 unfreeze_encoder=args.unfreeze_encoder
             )
             
+        policy_class = "CnnLstmPolicy"
+        if args.policy_type == "transformer":
+            from transformer_policy import RecurrentTransformerActorCriticPolicy
+            policy_class = RecurrentTransformerActorCriticPolicy
+            policy_kwargs["context_len"] = args.transformer_context
+            policy_kwargs["nhead"] = args.transformer_nhead
+
         if args.resume and os.path.exists(f"{args.resume}.zip"):
             print(f"Resuming training from {args.resume}.zip (Overriding n_steps={n_steps_val}, lr={lr_val})...")
             model = RecurrentPPO.load(args.resume, env=env, ent_coef=ent_coef_val, n_steps=n_steps_val, learning_rate=lr_val)
         else:
-            model = RecurrentPPO("CnnLstmPolicy", env, verbose=1, ent_coef=ent_coef_val, n_steps=n_steps_val, learning_rate=lr_val, tensorboard_log="./tensorboard_logs/", policy_kwargs=policy_kwargs)
+            model = RecurrentPPO(policy_class, env, verbose=1, ent_coef=ent_coef_val, n_steps=n_steps_val, learning_rate=lr_val, tensorboard_log="./tensorboard_logs/", policy_kwargs=policy_kwargs)
+            
+        if args.use_drq:
+            print("Wrapping features extractor with DrQ random shifts...")
+            model.policy.features_extractor = DrQFeaturesExtractorWrapper(model.policy.features_extractor, pad=4)
         
         mlflow.log_param("learning_rate", model.learning_rate)
         mlflow.log_param("ent_coef", ent_coef_val)
         mlflow.log_param("use_impala", args.use_impala)
+        mlflow.log_param("use_drq", args.use_drq)
+        mlflow.log_param("policy_type", args.policy_type)
+        if args.policy_type == "transformer":
+            mlflow.log_param("transformer_context", args.transformer_context)
+            mlflow.log_param("transformer_nhead", args.transformer_nhead)
+            
+        mlflow.log_param("use_spr", args.use_spr)
+        if args.use_spr:
+            mlflow.log_param("spr_lr", args.spr_lr)
+            mlflow.log_param("spr_batch_size", args.spr_batch_size)
+            mlflow.log_param("spr_epochs", args.spr_epochs)
+            mlflow.log_param("spr_k_steps", args.spr_k_steps)
         mlflow.log_param("use_autoencoder", args.use_autoencoder)
         mlflow.log_param("use_icm", args.use_icm)
         mlflow.log_param("use_curl", args.use_curl)
@@ -223,6 +277,18 @@ def main():
                 verbose=1
             )
             callbacks.append(curl_callback)
+
+        if args.use_spr:
+            from spr import SPRCallback
+            print(f"Enabling SPR Callback with lr={args.spr_lr}, batch_size={args.spr_batch_size}, epochs={args.spr_epochs}, k_steps={args.spr_k_steps}")
+            spr_callback = SPRCallback(
+                spr_lr=args.spr_lr,
+                batch_size=args.spr_batch_size,
+                epochs=args.spr_epochs,
+                k_steps=args.spr_k_steps,
+                verbose=1
+            )
+            callbacks.append(spr_callback)
 
         # Train Model with graceful interruption
         try:
