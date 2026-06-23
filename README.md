@@ -117,6 +117,41 @@ tensorboard --logdir logs/runs/dreamer_v3
 
 ---
 
+### 6. PPO Recorrente (LSTM) e Representações Contrastivas (CURL)
+Para lidar com dependências temporais complexas em que frames isolados não contêm informações suficientes sobre velocidade e aceleração (sem frame stacking), o pipeline suporta o **Recurrent PPO** (utilizando política LSTM).
+
+Além disso, integramos o **CURL (Contrastive Unsupervised Representations for Reinforcement Learning)** como uma tarefa de aprendizado de representação auxiliar online.
+
+* **Augmentação de Dados:** Aplica `random_crop` espacial sobre lotes extraídos do buffer de rollout para gerar duas visões diferentes de cada frame.
+* **Perda InfoNCE (Bilinear):** Otimiza uma matriz de projeção bilinear $W$ para maximizar a similaridade das visões correspondentes (positive pairs) e minimizar a similaridade com frames diferentes no batch (InfoNCE loss), atualizando a rede target por média móvel exponencial (EMA).
+* **Modo Híbrido (Autoencoder + CURL):** Permite inicializar o codificador com pesos do Autoencoder pré-treinado e mantê-lo descongelado (`--unfreeze-encoder`), permitindo ajuste fino online via CURL durante o treinamento de RL.
+
+**Comandos de Execução Comparativa (100k steps):**
+```bash
+# 1. PPO Recurrent Pure (NatureCNN original)
+python src/train_ppo_recurrent.py --timesteps 100000 --num-envs 4 --run-id ppo_pure_100k
+
+# 2. PPO Recurrent + Autoencoder Frozen (Codificador congelado)
+python src/train_ppo_recurrent.py --timesteps 100000 --num-envs 4 --use-autoencoder --run-id ppo_autoencoder_frozen_100k
+
+# 3. PPO Recurrent + CURL Online (Do zero)
+python src/train_ppo_recurrent.py --timesteps 100000 --num-envs 4 --use-curl --run-id ppo_curl_online_100k
+
+# 4. PPO Recurrent + Híbrido (Pesos do Autoencoder + Ajuste Fino via CURL)
+python src/train_ppo_recurrent.py --timesteps 100000 --num-envs 4 --use-autoencoder --use-curl --unfreeze-encoder --run-id ppo_hybrid_ae_curl_100k
+```
+
+**Resultado Comparativo da Pesquisa (100k passos):**
+
+| Configuração | Episódios | Recompensa Média | Desvio Padrão | Recompensa Máxima |
+| :--- | :---: | :---: | :---: | :---: |
+| **PPO Recurrent Pure** | 768 | 236.95 | 120.16 | **837.56** |
+| **Autoencoder Frozen** | 847 | 228.61 | 118.50 | 732.37 |
+| **CURL Online** | 732 | **254.00** | 113.11 | 702.25 |
+| **Híbrido AE + CURL** | 776 | 226.53 | 124.50 | 778.52 |
+
+---
+
 ## 💾 Gestão de Experimentos (MLOps)
 
 ### Versionamento de Modelos (Run IDs)

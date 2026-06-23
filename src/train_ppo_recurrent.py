@@ -58,7 +58,7 @@ def main():
             return True
 
     class CustomAutoencoderFeaturesExtractor(BaseFeaturesExtractor):
-        def __init__(self, observation_space, features_dim=512, model_path="models/autoencoder.pth"):
+        def __init__(self, observation_space, features_dim=512, model_path="models/autoencoder.pth", unfreeze_encoder=False):
             super().__init__(observation_space, features_dim)
             
             self.encoder = nn.Sequential(
@@ -85,10 +85,13 @@ def main():
                     
                 self.encoder.load_state_dict(encoder_state_dict)
                 
-                # Freeze the convolutional layers
-                for param in self.encoder.parameters():
-                    param.requires_grad = False
-                print("Autoencoder weights loaded and frozen!")
+                if not unfreeze_encoder:
+                    # Freeze the convolutional layers
+                    for param in self.encoder.parameters():
+                        param.requires_grad = False
+                    print("Autoencoder weights loaded and frozen!")
+                else:
+                    print("Autoencoder weights loaded and kept UNfrozen for online adaptation!")
             else:
                 print("Warning: Autoencoder weights not found. Using randomly initialized encoder.")
 
@@ -104,6 +107,11 @@ def main():
     parser.add_argument("--num-envs", type=int, default=4, help="Number of parallel environments to run")
     parser.add_argument("--use-autoencoder", action="store_true", help="Use pre-trained Autoencoder for vision")
     parser.add_argument("--use-icm", action="store_true", help="Use Intrinsic Curiosity Module (ICM)")
+    parser.add_argument("--use-curl", action="store_true", help="Use CURL representation learning callback")
+    parser.add_argument("--curl-lr", type=float, default=0.0001, help="Learning rate for CURL optimizer")
+    parser.add_argument("--curl-batch-size", type=int, default=64, help="Batch size for CURL contrastive learning")
+    parser.add_argument("--curl-epochs", type=int, default=5, help="Number of CURL epochs per rollout")
+    parser.add_argument("--unfreeze-encoder", action="store_true", help="Do not freeze encoder weights if using pre-trained weights")
     parser.add_argument("--run-id", type=str, default="recurrent_ppo_mario", help="Name/ID for this training run to avoid overwriting models")
     parser.add_argument("--n-steps", type=int, default=256, help="Number of PPO steps per rollout")
     parser.add_argument("--lr", type=float, default=0.0005, help="Learning rate for PPO training")
@@ -157,7 +165,10 @@ def main():
         )
         if args.use_autoencoder:
             policy_kwargs["features_extractor_class"] = CustomAutoencoderFeaturesExtractor
-            policy_kwargs["features_extractor_kwargs"] = dict(features_dim=512)
+            policy_kwargs["features_extractor_kwargs"] = dict(
+                features_dim=512,
+                unfreeze_encoder=args.unfreeze_encoder
+            )
             
         if args.resume and os.path.exists(f"{args.resume}.zip"):
             print(f"Resuming training from {args.resume}.zip (Overriding n_steps={n_steps_val}, lr={lr_val})...")
@@ -169,6 +180,12 @@ def main():
         mlflow.log_param("ent_coef", ent_coef_val)
         mlflow.log_param("use_autoencoder", args.use_autoencoder)
         mlflow.log_param("use_icm", args.use_icm)
+        mlflow.log_param("use_curl", args.use_curl)
+        if args.use_curl:
+            mlflow.log_param("curl_lr", args.curl_lr)
+            mlflow.log_param("curl_batch_size", args.curl_batch_size)
+            mlflow.log_param("curl_epochs", args.curl_epochs)
+            mlflow.log_param("unfreeze_encoder", args.unfreeze_encoder)
         mlflow.log_param("num_envs", args.num_envs)
         mlflow.log_param("n_steps", model.n_steps)
         mlflow.log_param("batch_size", model.batch_size)
@@ -188,11 +205,24 @@ def main():
             save_vecnormalize=True
         )
 
+        callbacks = [MLflowCallback(), checkpoint_callback]
+        
+        if args.use_curl:
+            from curl import CURLCallback
+            print(f"Enabling CURL Callback with lr={args.curl_lr}, batch_size={args.curl_batch_size}, epochs={args.curl_epochs}")
+            curl_callback = CURLCallback(
+                curl_lr=args.curl_lr,
+                batch_size=args.curl_batch_size,
+                epochs=args.curl_epochs,
+                verbose=1
+            )
+            callbacks.append(curl_callback)
+
         # Train Model with graceful interruption
         try:
             # If resuming, we tell SB3 NOT to reset the global step counter and learning rate schedule
             reset_ts = False if args.resume else True
-            model.learn(total_timesteps=timesteps, callback=[MLflowCallback(), checkpoint_callback], reset_num_timesteps=reset_ts)
+            model.learn(total_timesteps=timesteps, callback=callbacks, reset_num_timesteps=reset_ts)
         except KeyboardInterrupt:
             print("\nTreinamento interrompido pelo usuário! Salvando o progresso atual...")
         finally:
