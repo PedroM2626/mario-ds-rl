@@ -106,6 +106,7 @@ def main():
     parser.add_argument("--resume", type=str, default=None, help="Path to existing model to resume training (e.g. models/ppo_mario)")
     parser.add_argument("--num-envs", type=int, default=4, help="Number of parallel environments to run")
     parser.add_argument("--use-autoencoder", action="store_true", help="Use pre-trained Autoencoder for vision")
+    parser.add_argument("--use-impala", action="store_true", help="Use residual ImpalaCNN for vision")
     parser.add_argument("--use-icm", action="store_true", help="Use Intrinsic Curiosity Module (ICM)")
     parser.add_argument("--use-curl", action="store_true", help="Use CURL representation learning callback")
     parser.add_argument("--curl-lr", type=float, default=0.0001, help="Learning rate for CURL optimizer")
@@ -163,7 +164,11 @@ def main():
             enable_critic_lstm=True,
             lstm_hidden_size=256,
         )
-        if args.use_autoencoder:
+        if args.use_impala:
+            from impala_cnn import ImpalaCNNFeaturesExtractor
+            policy_kwargs["features_extractor_class"] = ImpalaCNNFeaturesExtractor
+            policy_kwargs["features_extractor_kwargs"] = dict(features_dim=512)
+        elif args.use_autoencoder:
             policy_kwargs["features_extractor_class"] = CustomAutoencoderFeaturesExtractor
             policy_kwargs["features_extractor_kwargs"] = dict(
                 features_dim=512,
@@ -178,6 +183,7 @@ def main():
         
         mlflow.log_param("learning_rate", model.learning_rate)
         mlflow.log_param("ent_coef", ent_coef_val)
+        mlflow.log_param("use_impala", args.use_impala)
         mlflow.log_param("use_autoencoder", args.use_autoencoder)
         mlflow.log_param("use_icm", args.use_icm)
         mlflow.log_param("use_curl", args.use_curl)
