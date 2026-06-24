@@ -143,12 +143,17 @@ python src/train_ppo_recurrent.py --timesteps 100000 --num-envs 4 --use-autoenco
 
 **Resultado Comparativo da Pesquisa (100k passos):**
 
+<!-- START_100K_TABLE -->
 | Configuração | Episódios | Recompensa Média | Desvio Padrão | Recompensa Máxima |
 | :--- | :---: | :---: | :---: | :---: |
-| **PPO Recurrent Pure** | 768 | 236.95 | 120.16 | **837.56** |
+| **PPO Recurrent Pure (NatureCNN)** | 768 | 236.95 | 120.16 | 837.56 |
 | **Autoencoder Frozen** | 847 | 228.61 | 118.50 | 732.37 |
-| **CURL Online** | 732 | **254.00** | 113.11 | 702.25 |
+| **CURL Online** | 732 | 254.00 | 113.11 | 702.25 |
 | **Híbrido AE + CURL** | 776 | 226.53 | 124.50 | 778.52 |
+| **PPO Recurrent + DrQ-v2 (Random Shifts)** | N/A | 0.00 | 0.00 | 0.00 |
+| **PPO Recurrent + SPR (Multi-step Latent)** | N/A | 0.00 | 0.00 | 0.00 |
+| **PPO Causal Transformer + SPR (Nova Arquitetura)** | N/A | 0.00 | 0.00 | 0.00 |
+<!-- END_100K_TABLE -->
 
 ---
 

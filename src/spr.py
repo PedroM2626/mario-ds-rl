@@ -137,6 +137,8 @@ class SPRCallback(BaseCallback):
         # Convert to torch tensors
         obs_tensor = torch.as_tensor(obs, device=self.model.device).float()
         actions_tensor = torch.as_tensor(actions, device=self.model.device).long()
+        if len(actions_tensor.shape) == 3:
+            actions_tensor = actions_tensor.squeeze(-1)
         
         n_steps, num_envs = actions_tensor.shape
         K = self.k_steps

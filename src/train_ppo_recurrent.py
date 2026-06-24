@@ -15,11 +15,43 @@ def make_env(rom_path, state_path, rank):
         # Disable CUDA for child processes to save VRAM and prevent CUDA OOM
         os.environ["CUDA_VISIBLE_DEVICES"] = ""
         import time
+        import shutil
+        import tempfile
         from stable_baselines3.common.monitor import Monitor
         # Stagger environment initialization to prevent file locking/sharing issues
         time.sleep(rank * 1.5)
         print(f"[Env {rank}] Starting initialization...")
-        env = MarioNdsEnv(rom_path=rom_path, state_path=state_path)
+        
+        # Create unique temp paths for ROM and savestate to prevent concurrency issues on Windows
+        temp_dir = tempfile.gettempdir()
+        rom_ext = os.path.splitext(rom_path)[1]
+        state_ext = os.path.splitext(state_path)[1]
+        
+        temp_rom_path = os.path.join(temp_dir, f"mario_rom_env_{rank}_{os.getpid()}{rom_ext}")
+        temp_state_path = os.path.join(temp_dir, f"mario_state_env_{rank}_{os.getpid()}{state_ext}")
+        
+        print(f"[Env {rank}] Creating temporary ROM and savestate files...")
+        shutil.copy2(rom_path, temp_rom_path)
+        shutil.copy2(state_path, temp_state_path)
+        
+        # Instantiate environment using temp paths
+        env = MarioNdsEnv(rom_path=temp_rom_path, state_path=temp_state_path)
+        
+        # Wrap the env close method to delete the temp files when training finishes
+        original_close = env.close
+        def custom_close():
+            original_close()
+            print(f"[Env {rank}] Cleaning up temporary files...")
+            try:
+                if os.path.exists(temp_rom_path):
+                    os.remove(temp_rom_path)
+                if os.path.exists(temp_state_path):
+                    os.remove(temp_state_path)
+            except Exception as e:
+                print(f"[Env {rank}] Error cleaning up temp files: {e}")
+                
+        env.close = custom_close
+        
         env = Monitor(env)
         print(f"[Env {rank}] Initialization complete!")
         return env
@@ -104,7 +136,7 @@ def main():
         to the inputs during training (when self.training is True).
         """
         def __init__(self, base_extractor, pad=4):
-            super().__init__(base_extractor.observation_space, base_extractor.features_dim)
+            super().__init__(base_extractor._observation_space, base_extractor.features_dim)
             self.base_extractor = base_extractor
             self.pad = pad
             
@@ -148,6 +180,7 @@ def main():
     parser.add_argument("--n-steps", type=int, default=256, help="Number of PPO steps per rollout")
     parser.add_argument("--lr", type=float, default=0.0005, help="Learning rate for PPO training")
     parser.add_argument("--ent-coef", type=float, default=0.01, help="Entropy coefficient for PPO")
+    parser.add_argument("--device", type=str, default="cuda", help="PyTorch device (cuda, cpu, auto)")
     args = parser.parse_args()
 
     # Create directories if they don't exist
@@ -213,15 +246,36 @@ def main():
             policy_kwargs["context_len"] = args.transformer_context
             policy_kwargs["nhead"] = args.transformer_nhead
 
-        if args.resume and os.path.exists(f"{args.resume}.zip"):
-            print(f"Resuming training from {args.resume}.zip (Overriding n_steps={n_steps_val}, lr={lr_val})...")
-            model = RecurrentPPO.load(args.resume, env=env, ent_coef=ent_coef_val, n_steps=n_steps_val, learning_rate=lr_val)
-        else:
-            model = RecurrentPPO(policy_class, env, verbose=1, ent_coef=ent_coef_val, n_steps=n_steps_val, learning_rate=lr_val, tensorboard_log="./tensorboard_logs/", policy_kwargs=policy_kwargs)
+        # Determine device
+        device_name = args.device
+        if device_name == "cuda" and not torch.cuda.is_available():
+            print("CUDA is not available, falling back to CPU.")
+            device_name = "cpu"
+
+        def init_model(dev):
+            if args.resume and os.path.exists(f"{args.resume}.zip"):
+                print(f"Resuming training from {args.resume}.zip (Overriding n_steps={n_steps_val}, lr={lr_val}, device={dev})...")
+                model_obj = RecurrentPPO.load(args.resume, env=env, ent_coef=ent_coef_val, n_steps=n_steps_val, learning_rate=lr_val, device=dev)
+            else:
+                model_obj = RecurrentPPO(policy_class, env, verbose=1, ent_coef=ent_coef_val, n_steps=n_steps_val, learning_rate=lr_val, tensorboard_log="./tensorboard_logs/", policy_kwargs=policy_kwargs, device=dev)
             
-        if args.use_drq:
-            print("Wrapping features extractor with DrQ random shifts...")
-            model.policy.features_extractor = DrQFeaturesExtractorWrapper(model.policy.features_extractor, pad=4)
+            if args.use_drq:
+                print("Wrapping features extractor with DrQ random shifts...")
+                model_obj.policy.features_extractor = DrQFeaturesExtractorWrapper(model_obj.policy.features_extractor, pad=4)
+            return model_obj
+
+        try:
+            model = init_model(device_name)
+        except RuntimeError as e:
+            if "out of memory" in str(e).lower() and device_name == "cuda":
+                print("\n[WARNING] CUDA Out of Memory during model initialization. Falling back to CPU...")
+                import gc
+                gc.collect()
+                torch.cuda.empty_cache()
+                device_name = "cpu"
+                model = init_model(device_name)
+            else:
+                raise e
         
         mlflow.log_param("learning_rate", model.learning_rate)
         mlflow.log_param("ent_coef", ent_coef_val)
@@ -290,13 +344,27 @@ def main():
             )
             callbacks.append(spr_callback)
 
-        # Train Model with graceful interruption
+        # Train Model with graceful interruption and CUDA OOM fallback
         try:
             # If resuming, we tell SB3 NOT to reset the global step counter and learning rate schedule
             reset_ts = False if args.resume else True
             model.learn(total_timesteps=timesteps, callback=callbacks, reset_num_timesteps=reset_ts)
         except KeyboardInterrupt:
             print("\nTreinamento interrompido pelo usuário! Salvando o progresso atual...")
+        except RuntimeError as e:
+            if "out of memory" in str(e).lower() and device_name == "cuda":
+                print("\n[WARNING] CUDA Out of Memory during training. Attempting to fall back to CPU...")
+                import gc
+                del model
+                gc.collect()
+                torch.cuda.empty_cache()
+                device_name = "cpu"
+                print("Re-initializing model on CPU...")
+                model = init_model(device_name)
+                # Re-add callbacks or reuse callbacks list
+                model.learn(total_timesteps=timesteps, callback=callbacks, reset_num_timesteps=reset_ts)
+            else:
+                raise e
         finally:
             print("Closing environments...")
             env.close()
