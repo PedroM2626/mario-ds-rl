@@ -18,7 +18,7 @@ class CausalTransformerWrapper(nn.Module):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.context_len = context_len
-        self.num_layers = num_layers
+        self.num_layers = context_len # Mock the LSTM num_layers attribute for SB3 state initialization
         
         # Project input features to hidden_size if they are different
         self.input_proj = nn.Linear(input_size, hidden_size) if input_size != hidden_size else nn.Identity()

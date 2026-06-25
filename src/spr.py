@@ -6,6 +6,13 @@ from stable_baselines3.common.callbacks import BaseCallback
 import mlflow
 from curl import random_crop
 
+def safe_cosine_similarity(x1, x2, dim=-1, eps=1e-6):
+    # Add eps to norm to prevent division by zero (forward) and gradient explosion (backward)
+    x1_norm = x1.norm(dim=dim, keepdim=True) + eps
+    x2_norm = x2.norm(dim=dim, keepdim=True) + eps
+    return (x1 / x1_norm * x2 / x2_norm).sum(dim=dim)
+
+
 class TransitionModel(nn.Module):
     """
     Predicts the next representation z_{t+1} given the current representation z_t and action a_t.
@@ -188,7 +195,7 @@ class SPRCallback(BaseCallback):
                 p_target0 = self.spr.target_projector(z_target0)
                 
             # Cosine similarity loss at step 0
-            loss = - F.cosine_similarity(p0, p_target0, dim=-1).mean()
+            loss = - safe_cosine_similarity(p0, p_target0, dim=-1).mean()
             
             # 2. Steps 1 to K: Rollout transition model
             for k in range(K):
@@ -204,7 +211,7 @@ class SPRCallback(BaseCallback):
                     p_target = self.spr.target_projector(z_target)
                     
                 # Add to multi-step loss
-                loss += - F.cosine_similarity(p, p_target, dim=-1).mean()
+                loss += - safe_cosine_similarity(p, p_target, dim=-1).mean()
                 
             # Average loss over all prediction steps
             loss = loss / (K + 1)
@@ -212,7 +219,22 @@ class SPRCallback(BaseCallback):
             # Gradient update
             self.optimizer.zero_grad()
             loss.backward()
-            self.optimizer.step()
+            
+            # Check for NaNs or Infs in gradients to prevent model corruption
+            trainable_params = [p for p in self.spr.parameters() if p.requires_grad]
+            has_nan = False
+            for p in trainable_params:
+                if p.grad is not None and (torch.isnan(p.grad).any() or torch.isinf(p.grad).any()):
+                    has_nan = True
+                    break
+            
+            if has_nan:
+                print(f"[SPR] Warning: NaN/Inf gradients detected at step {self.num_timesteps}. Skipping optimizer step.")
+                self.optimizer.zero_grad()
+            else:
+                # Apply gradient clipping to prevent gradient explosion
+                torch.nn.utils.clip_grad_norm_(trainable_params, max_norm=1.0)
+                self.optimizer.step()
             
             losses.append(loss.item())
             

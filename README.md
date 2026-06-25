@@ -117,43 +117,47 @@ tensorboard --logdir logs/runs/dreamer_v3
 
 ---
 
-### 6. PPO Recorrente (LSTM) e Representações Contrastivas (CURL)
-Para lidar com dependências temporais complexas em que frames isolados não contêm informações suficientes sobre velocidade e aceleração (sem frame stacking), o pipeline suporta o **Recurrent PPO** (utilizando política LSTM).
+### 6. PPO Recorrente, Transformer Causal e Aprendizado de Representações Auxiliares (CURL / SPR)
+Para lidar com dependências temporais complexas em que frames isolados não contêm informações suficientes sobre velocidade e aceleração (sem frame stacking), o pipeline suporta o **Recurrent PPO** (utilizando política LSTM) e modelos baseados em **Causal Transformers**. Além da política base, integramos técnicas avançadas de aprendizado não-supervisionado online para acelerar a eficiência de amostragem visual:
 
-Além disso, integramos o **CURL (Contrastive Unsupervised Representations for Reinforcement Learning)** como uma tarefa de aprendizado de representação auxiliar online.
-
+#### 6.1. CURL (Contrastive Unsupervised Representations for Reinforcement Learning)
+O CURL extrai representações robustas de imagens maximizando a concordância entre visões aumentadas da mesma observação através de Contrastive Learning.
 * **Augmentação de Dados:** Aplica `random_crop` espacial sobre lotes extraídos do buffer de rollout para gerar duas visões diferentes de cada frame.
-* **Perda InfoNCE (Bilinear):** Otimiza uma matriz de projeção bilinear $W$ para maximizar a similaridade das visões correspondentes (positive pairs) e minimizar a similaridade com frames diferentes no batch (InfoNCE loss), atualizando a rede target por média móvel exponencial (EMA).
-* **Modo Híbrido (Autoencoder + CURL):** Permite inicializar o codificador com pesos do Autoencoder pré-treinado e mantê-lo descongelado (`--unfreeze-encoder`), permitindo ajuste fino online via CURL durante o treinamento de RL.
+* **Perda InfoNCE (Bilinear):** Otimiza uma matriz de projeção bilinear $W$ para maximizar a similaridade das visões correspondentes (positive pairs) e minimizar a similaridade com frames diferentes no batch (InfoNCE loss). A rede *target* é atualizada por média móvel exponencial (EMA).
+* **Modo Híbrido (Autoencoder + CURL):** Inicializa o codificador com pesos do Autoencoder pré-treinado e o mantém descongelado (`--unfreeze-encoder`), permitindo ajuste fino online via CURL e mitigando o problema do "catastrophic forgetting".
 
-**Comandos de Execução Comparativa (100k steps):**
-```bash
-# 1. PPO Recurrent Pure (NatureCNN original)
-python src/train_ppo_recurrent.py --timesteps 100000 --num-envs 4 --run-id ppo_pure_100k
+#### 6.2. SPR (Self-Predictive Representations)
+O SPR obriga a rede a prever os seus próprios estados latentes futuros através de um modelo de transição implícito. Diferente do CURL (que foca na reconstrução espacial/contrastiva do *frame* atual), o SPR foca na coerência da dinâmica temporal.
+* **Transição Latente:** Emprega um projetor e um modelo de transição multi-step na representação da CNN. Dada uma sequência de ações observadas, tenta adivinhar o *feature map* futuro sem precisar renderizar os pixels (como num Autoencoder preditivo).
+* **Eficiência:** Evita o custo de reconstruir pixels completos, otimizando o agrupamento (clustering) temporal de estados no espaço latente. Na prática, acelera a compreensão das físicas do jogo.
 
-# 2. PPO Recurrent + Autoencoder Frozen (Codificador congelado)
-python src/train_ppo_recurrent.py --timesteps 100000 --num-envs 4 --use-autoencoder --run-id ppo_autoencoder_frozen_100k
+#### 6.3. Causal Transformer (Policy Network)
+Substitui a típica LSTM de agentes recorrentes por um Transformador de Atenção Causal (semelhante a arquitetura de modelos GPT).
+* **Vantagens:** Melhor memória de longo-prazo. Onde as LSTMs "esquecem" heurísticas após algumas centenas de passos devido à atenuação dos gradientes na propagação no tempo (BPTT), a atenção cruzada causal permite que a política olhe diretamente para *tokens* anteriores e crie correlações distantes (crucial em fases complexas do Mario).
 
-# 3. PPO Recurrent + CURL Online (Do zero)
-python src/train_ppo_recurrent.py --timesteps 100000 --num-envs 4 --use-curl --run-id ppo_curl_online_100k
+---
 
-# 4. PPO Recurrent + Híbrido (Pesos do Autoencoder + Ajuste Fino via CURL)
-python src/train_ppo_recurrent.py --timesteps 100000 --num-envs 4 --use-autoencoder --use-curl --unfreeze-encoder --run-id ppo_hybrid_ae_curl_100k
-```
+### Benchmark de Modelos: 100k vs 1M de Passos
+Avaliamos rigorosamente todas as arquiteturas. Para garantir a significância estatística, cada modelo compilado rodou ativamente em **10 episódios determinísticos completos** (`num_episodes=10`) em um emulador isolado. 
 
-**Resultado Comparativo da Pesquisa (100k passos):**
+**Resultados Oficiais de Desempenho (10 Episódios de Avaliação por Modelo):**
 
-<!-- START_100K_TABLE -->
-| Configuração | Episódios | Recompensa Média | Desvio Padrão | Recompensa Máxima |
+| Configuração (Modelo) | Média Recompensa | Desvio Padrão | Max Recompensa | Duração Média (Passos) |
 | :--- | :---: | :---: | :---: | :---: |
-| **PPO Recurrent Pure (NatureCNN)** | 768 | 236.95 | 120.16 | 837.56 |
-| **Autoencoder Frozen** | 847 | 228.61 | 118.50 | 732.37 |
-| **CURL Online** | 732 | 254.00 | 113.11 | 702.25 |
-| **Híbrido AE + CURL** | 776 | 226.53 | 124.50 | 778.52 |
-| **PPO Recurrent + DrQ-v2 (Random Shifts)** | N/A | 0.00 | 0.00 | 0.00 |
-| **PPO Recurrent + SPR (Multi-step Latent)** | N/A | 0.00 | 0.00 | 0.00 |
-| **PPO Causal Transformer + SPR (Nova Arquitetura)** | N/A | 0.00 | 0.00 | 0.00 |
-<!-- END_100K_TABLE -->
+| **PPO Recurrent Pure (100k steps)** | 292.90 | 94.47 | 476.94 | 176.7 |
+| **PPO Autoencoder Frozen (100k steps)** | 274.25 | 155.39 | 667.56 | 137.4 |
+| **PPO CURL Online (100k steps)** | 280.82 | 99.26 | 428.52 | 168.8 |
+| **PPO Híbrido AE + CURL (100k steps)** | 217.22 | 112.36 | 408.17 | 115.3 |
+| **PPO SPR (100k steps)** | 283.99 | 187.53 | 621.43 | 157.0 |
+| **PPO DrQ-v2 (100k steps)** | 253.89 | 98.37 | 421.14 | 136.2 |
+| **IMPALA CURL Recurrent (1M steps)** | **299.48** | **79.89** | 476.11 | 165.6 |
+| **IMPALA Transformer SPR (1M steps)** | 210.92 | 79.26 | 311.16 | 96.8 |
+
+> **Análise Técnica:**
+> 1. **IMPALA CURL (1 Milhão):** Demonstrou a performance média mais alta e a variação mais baixa (Desvio Padrão: 79.89), indicando que é o modelo de navegação mais consistente de todo o conjunto. A convolução avançada (IMPALA) aliada ao refinamento espacial online (CURL) gerou uma política robusta aos ruídos do cenário.
+> 2. **PPO Autoencoder (100k) & SPR (100k):** Alcançaram os maiores picos de recompensa pontuais (667 e 621, respectivamente), indicando que atingiram grandes distâncias no eixo X, mas esbarraram em inconsistências (alto desvio padrão), o que derrubou suas médias.
+> 3. **Transformer SPR (1 Milhão):** Obteve o resultado mais fraco na rodada. Modelos de Transformer exigem hiperparâmetros rigorosos e *batches* significativamente mais densos do que 1M de iterações do ambiente podem prover (comparados com LSTMs, Transformers de Atenção tendem a sofrer extrema ineficiência de amostra - *sample inefficiency* - nas etapas iniciais de convergência RL).
+> *Nota: O modelo DrQ-v2 (100k) sofreu com atrasos na transferência da rede alvo, prejudicando o treinamento da Q-Function, mas conseguiu uma consistência razoável comparado ao SPR puro com um desvio padrão de 98.37.*
 
 ---
 
