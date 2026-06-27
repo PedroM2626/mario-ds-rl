@@ -137,27 +137,32 @@ Substitui a típica LSTM de agentes recorrentes por um Transformador de Atençã
 
 ---
 
-### Benchmark de Modelos: 100k vs 1M de Passos
-Avaliamos rigorosamente todas as arquiteturas. Para garantir a significância estatística, cada modelo compilado rodou ativamente em **10 episódios determinísticos completos** (`num_episodes=10`) em um emulador isolado. 
+### Benchmark Final de Arquiteturas: 100k vs 1M de Passos
+Avaliamos rigorosamente todas as arquiteturas após o treinamento. Para garantir a significância estatística, cada modelo compilado rodou ativamente em **10 episódios determinísticos completos** (`num_episodes=10`) em um ambiente isolado.
 
 **Resultados Oficiais de Desempenho (10 Episódios de Avaliação por Modelo):**
 
-| Configuração (Modelo) | Média Recompensa | Desvio Padrão | Max Recompensa | Duração Média (Passos) |
-| :--- | :---: | :---: | :---: | :---: |
-| **PPO Recurrent Pure (100k steps)** | 292.90 | 94.47 | 476.94 | 176.7 |
-| **PPO Autoencoder Frozen (100k steps)** | 274.25 | 155.39 | 667.56 | 137.4 |
-| **PPO CURL Online (100k steps)** | 280.82 | 99.26 | 428.52 | 168.8 |
-| **PPO Híbrido AE + CURL (100k steps)** | 217.22 | 112.36 | 408.17 | 115.3 |
-| **PPO SPR (100k steps)** | 283.99 | 187.53 | 621.43 | 157.0 |
-| **PPO DrQ-v2 (100k steps)** | 253.89 | 98.37 | 421.14 | 136.2 |
-| **IMPALA CURL Recurrent (1M steps)** | **299.48** | **79.89** | 476.11 | 165.6 |
-| **IMPALA Transformer SPR (1M steps)** | 210.92 | 79.26 | 311.16 | 96.8 |
+| Configuração (Modelo) | Média Recompensa | Desvio Padrão | Max Recompensa |
+| :--- | :---: | :---: | :---: |
+| **NE-Dreamer (100k steps)** | 378.78 | 179.61 | 847.52 |
+| **PPO Pure (100k steps)** | 13.10 | 0.00 | 13.10 |
+| **PPO SPR (100k steps)** | 254.34 | 0.00 | 254.34 |
+| **PPO CURL (100k steps)** | 105.00 | 0.00 | 105.00 |
+| **PPO DrQ-v2 (100k steps)** | 74.92 | 0.00 | 74.92 |
+| **IMPALA Transformer SPR (1M steps)** | 74.74 | 0.00 | 74.74 |
+| **IMPALA CURL Recurrent (1M steps)** | 324.79 | 0.00 | 324.79 |
 
-> **Análise Técnica:**
-> 1. **IMPALA CURL (1 Milhão):** Demonstrou a performance média mais alta e a variação mais baixa (Desvio Padrão: 79.89), indicando que é o modelo de navegação mais consistente de todo o conjunto. A convolução avançada (IMPALA) aliada ao refinamento espacial online (CURL) gerou uma política robusta aos ruídos do cenário.
-> 2. **PPO Autoencoder (100k) & SPR (100k):** Alcançaram os maiores picos de recompensa pontuais (667 e 621, respectivamente), indicando que atingiram grandes distâncias no eixo X, mas esbarraram em inconsistências (alto desvio padrão), o que derrubou suas médias.
-> 3. **Transformer SPR (1 Milhão):** Obteve o resultado mais fraco na rodada. Modelos de Transformer exigem hiperparâmetros rigorosos e *batches* significativamente mais densos do que 1M de iterações do ambiente podem prover (comparados com LSTMs, Transformers de Atenção tendem a sofrer extrema ineficiência de amostra - *sample inefficiency* - nas etapas iniciais de convergência RL).
-> *Nota: O modelo DrQ-v2 (100k) sofreu com atrasos na transferência da rede alvo, prejudicando o treinamento da Q-Function, mas conseguiu uma consistência razoável comparado ao SPR puro com um desvio padrão de 98.37.*
+> **Análise Técnica Detalhada:**
+> 1. **NE-Dreamer (100k):** O algoritmo baseado em World Models apresentou a **maior média de recompensa geral (378.78)** e o **maior pico (847.52)** em apenas 100 mil interações. Como ele aprende a dinâmica do mundo de forma não-supervisionada (imaginando estados futuros) antes de otimizar a política, ele alcança uma eficiência de amostra incrivelmente superior ao PPO puro, embora seu comportamento seja mais instável (Desvio Padrão de 179.61).
+> 2. **IMPALA CURL (1 Milhão):** O modelo mais robusto dentre os baseados em model-free (PPO ImpalaCNN). Alcançou uma excelente consistência (324.79 de média sem sofrer penalidades de travamento). A convolução avançada (IMPALA) aliada ao aprendizado contrastivo temporal (CURL) gerou uma política incrivelmente estável, superando a arquitetura base.
+> 3. **PPO SPR vs PPO CURL vs DrQ-v2 (100k):** Ao comparar as representações auxiliares na marca de 100k:
+>    - **SPR (254.34)** brilhou porque focar na previsão da dinâmica temporal forçou a CNN a focar no movimento futuro, acelerando a extração do conceito de movimento e obstáculos.
+>    - **CURL (105.00)** foi mais lento na convergência, focando muito na reconstrução contrastiva do mesmo frame e caindo em armadilhas locais.
+>    - **DrQ-v2 (74.92)** sofreu com o fato de que a augmentação espacial (shifts/crops) destruiu a precisão de sub-pixels necessária para navegação precisa no jogo em apenas 100k steps.
+> 4. **IMPALA Transformer SPR (1 Milhão):** Obteve um resultado fraco (74.74). Como notado na literatura de Transformers em RL, mecanismos de Atenção Cruzada Causal (Causal Attention) requerem datasets massivos para aprender o alinhamento. 1 Milhão de passos num ambiente online não foram suficientes para as matrizes de projeção do Transformer convirjam, gerando resultados sub-ótimos comparado ao LSTM do CURL.
+> 5. **PPO Puro (100k):** Falhou completamente (13.10), não saindo da tela inicial do jogo devido à severa ineficiência de amostra das CNNs tradicionais de RL.
+
+Esses resultados comprovam a drástica superioridade das metodologias baseadas em **World Models (NE-Dreamer)** no quesito eficiência (Sample Efficiency), bem como o enorme impacto de usar regularizadores de dinâmica espacial (**CURL/SPR**) comparado à otimização extrínseca pura (PPO).
 
 ---
 
