@@ -68,11 +68,15 @@ def main():
     class MLflowCallback(BaseCallback):
         """
         Custom callback for logging to MLflow.
+        NOTA: metricas intrinsecas existem em TODO step (ICM) — logar cada uma
+        com mlflow.log_metric (1 commit SQLite por chamada) derruba o treino
+        de ~29fps p/ ~4fps. Por isso vao amostradas a cada 50 steps.
         """
         def __init__(self, verbose=0):
             super().__init__(verbose)
             self.episode_rewards = []
             self.episode_lengths = []
+            self._intrin_buf = []
 
         def _on_step(self) -> bool:
             # If the environment is vectorized, check infos for episode data
@@ -85,8 +89,13 @@ def main():
                     mlflow.log_metric("episode_reward", info["episode"]["r"], step=self.num_timesteps)
                     mlflow.log_metric("episode_length", info["episode"]["l"], step=self.num_timesteps)
                 if "intrinsic_reward" in info:
-                    mlflow.log_metric("intrinsic_reward", info["intrinsic_reward"], step=self.num_timesteps)
-                    mlflow.log_metric("extrinsic_reward", info["extrinsic_reward"], step=self.num_timesteps)
+                    self._intrin_buf.append((info["intrinsic_reward"], info["extrinsic_reward"]))
+                    if len(self._intrin_buf) >= 50:
+                        import numpy as _np
+                        arr = _np.array(self._intrin_buf, dtype=float)
+                        mlflow.log_metric("intrinsic_reward", float(arr[:, 0].mean()), step=self.num_timesteps)
+                        mlflow.log_metric("extrinsic_reward", float(arr[:, 1].mean()), step=self.num_timesteps)
+                        self._intrin_buf.clear()
             return True
 
     class CustomAutoencoderFeaturesExtractor(BaseFeaturesExtractor):
@@ -156,6 +165,7 @@ def main():
     parser.add_argument("--use-autoencoder", action="store_true", help="Use pre-trained Autoencoder for vision")
     parser.add_argument("--use-impala", action="store_true", help="Use residual ImpalaCNN for vision")
     parser.add_argument("--use-icm", action="store_true", help="Use Intrinsic Curiosity Module (ICM)")
+    parser.add_argument("--icm-update-freq", type=int, default=1, help="ICM backward a cada K env-steps (1 = original; recompensa intrinseca calculada todo step)")
     parser.add_argument("--use-curl", action="store_true", help="Use CURL representation learning callback")
     parser.add_argument("--curl-lr", type=float, default=0.0001, help="Learning rate for CURL optimizer")
     parser.add_argument("--curl-batch-size", type=int, default=64, help="Batch size for CURL contrastive learning")
@@ -181,6 +191,7 @@ def main():
     parser.add_argument("--lr", type=float, default=0.0005, help="Learning rate for PPO training")
     parser.add_argument("--ent-coef", type=float, default=0.01, help="Entropy coefficient for PPO")
     parser.add_argument("--device", type=str, default="cuda", help="PyTorch device (cuda, cpu, auto)")
+    parser.add_argument("--no-tensorboard", action="store_true", help="Desativa o log TensorBoard (evita importar o TensorFlow; o MLflow continua ativo)")
     args = parser.parse_args()
 
     # Create directories if they don't exist
@@ -216,8 +227,8 @@ def main():
 
         if args.use_icm:
             from icm import ICMVecEnvWrapper
-            print("Wrapping environment with Intrinsic Curiosity Module (ICM)...")
-            env = ICMVecEnvWrapper(env)
+            print(f"Wrapping environment with Intrinsic Curiosity Module (ICM, update_freq={args.icm_update_freq})...")
+            env = ICMVecEnvWrapper(env, update_freq=args.icm_update_freq)
 
         # Initialize or Load Model
         ent_coef_val = args.ent_coef
@@ -253,11 +264,12 @@ def main():
             device_name = "cpu"
 
         def init_model(dev):
+            tb_log = None if args.no_tensorboard else "./tensorboard_logs/"
             if args.resume and os.path.exists(f"{args.resume}.zip"):
                 print(f"Resuming training from {args.resume}.zip (Overriding n_steps={n_steps_val}, lr={lr_val}, device={dev})...")
                 model_obj = RecurrentPPO.load(args.resume, env=env, ent_coef=ent_coef_val, n_steps=n_steps_val, learning_rate=lr_val, device=dev)
             else:
-                model_obj = RecurrentPPO(policy_class, env, verbose=1, ent_coef=ent_coef_val, n_steps=n_steps_val, learning_rate=lr_val, tensorboard_log="./tensorboard_logs/", policy_kwargs=policy_kwargs, device=dev)
+                model_obj = RecurrentPPO(policy_class, env, verbose=1, ent_coef=ent_coef_val, n_steps=n_steps_val, learning_rate=lr_val, tensorboard_log=tb_log, policy_kwargs=policy_kwargs, device=dev)
             
             if args.use_drq:
                 print("Wrapping features extractor with DrQ random shifts...")
@@ -294,6 +306,7 @@ def main():
             mlflow.log_param("spr_k_steps", args.spr_k_steps)
         mlflow.log_param("use_autoencoder", args.use_autoencoder)
         mlflow.log_param("use_icm", args.use_icm)
+        mlflow.log_param("icm_update_freq", args.icm_update_freq)
         mlflow.log_param("use_curl", args.use_curl)
         if args.use_curl:
             mlflow.log_param("curl_lr", args.curl_lr)

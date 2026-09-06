@@ -12,11 +12,14 @@ from env import MarioNdsEnv
 class MLflowCallback(BaseCallback):
     """
     Custom callback for logging to MLflow.
+    NOTA: metricas intrinsecas existem em TODO step (ICM) — logar cada uma
+    derruba o treino (~7x mais lento por commits SQLite). Amostradas a cada 50.
     """
     def __init__(self, verbose=0):
         super().__init__(verbose)
         self.episode_rewards = []
         self.episode_lengths = []
+        self._intrin_buf = []
 
     def _on_step(self) -> bool:
         # If the environment is vectorized, check infos for episode data
@@ -29,8 +32,13 @@ class MLflowCallback(BaseCallback):
                 mlflow.log_metric("episode_reward", info["episode"]["r"], step=self.num_timesteps)
                 mlflow.log_metric("episode_length", info["episode"]["l"], step=self.num_timesteps)
             if "intrinsic_reward" in info:
-                mlflow.log_metric("intrinsic_reward", info["intrinsic_reward"], step=self.num_timesteps)
-                mlflow.log_metric("extrinsic_reward", info["extrinsic_reward"], step=self.num_timesteps)
+                self._intrin_buf.append((info["intrinsic_reward"], info["extrinsic_reward"]))
+                if len(self._intrin_buf) >= 50:
+                    import numpy as _np
+                    arr = _np.array(self._intrin_buf, dtype=float)
+                    mlflow.log_metric("intrinsic_reward", float(arr[:, 0].mean()), step=self.num_timesteps)
+                    mlflow.log_metric("extrinsic_reward", float(arr[:, 1].mean()), step=self.num_timesteps)
+                    self._intrin_buf.clear()
         return True
 
 class CustomAutoencoderFeaturesExtractor(BaseFeaturesExtractor):

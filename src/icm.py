@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -63,11 +64,15 @@ class ICMModel(nn.Module):
 class ICMVecEnvWrapper(VecEnvWrapper):
     """
     VecEnv Wrapper that trains an ICM module and adds intrinsic curiosity reward to the Extrinsic reward.
+    update_freq: a cada quantos env-steps roda o backward+optim (default 1 = original).
+    A recompensa intrinseca e calculada TODO step (mesmo sinal); so o treino e
+    batchizado — pratica padrao (updates em minibatch) e ~Nx mais rapido.
     """
-    def __init__(self, venv, intrinsic_scale=0.1, forward_loss_weight=0.2):
+    def __init__(self, venv, intrinsic_scale=0.1, forward_loss_weight=0.2, update_freq=1):
         super().__init__(venv)
         self.intrinsic_scale = intrinsic_scale
         self.forward_loss_weight = forward_loss_weight
+        self.update_freq = max(1, int(update_freq))
         
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.icm = ICMModel(venv.observation_space.shape, venv.action_space.n).to(self.device)
@@ -75,6 +80,7 @@ class ICMVecEnvWrapper(VecEnvWrapper):
         
         self.prev_obs = None
         self.last_actions = None
+        self._buf = []  # transicoes acumuladas p/ update batchizado
 
     def reset(self):
         obs = self.venv.reset()
@@ -99,23 +105,41 @@ class ICMVecEnvWrapper(VecEnvWrapper):
         actions_tensor = torch.LongTensor(self.last_actions).to(self.device)
         action_one_hot = F.one_hot(actions_tensor, num_classes=self.action_space.n).float()
         
-        pred_action_logits, pred_phi_t1, phi_t1_target = self.icm(state_tensor, next_state_tensor, action_one_hot)
+        # Recompensa intrinseca: forward SEM grad todo step (barato)
+        with torch.no_grad():
+            _, pred_phi_t1_nograd, phi_t1_target_nograd = self.icm(
+                state_tensor, next_state_tensor, action_one_hot)
+            forward_error_nograd = F.mse_loss(
+                pred_phi_t1_nograd, phi_t1_target_nograd, reduction='none').mean(dim=1)
+        intrinsic_rewards = forward_error_nograd.cpu().numpy() * self.intrinsic_scale
         
-        # Intrinsic Reward calculation: Mean squared error of forward model
-        forward_error = F.mse_loss(pred_phi_t1, phi_t1_target, reduction='none').mean(dim=1)
-        intrinsic_rewards = forward_error.detach().cpu().numpy() * self.intrinsic_scale
-        
-        # Losses
-        inverse_loss = F.cross_entropy(pred_action_logits, actions_tensor)
-        forward_loss = forward_error.mean()
-        
-        # Total ICM Loss
-        loss = (1.0 - self.forward_loss_weight) * inverse_loss + self.forward_loss_weight * forward_loss
-        
-        # Optimization step
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
+        # Treino batchizado a cada update_freq steps
+        self._buf.append((self.prev_obs.copy(), np.array(obs, copy=True),
+                          np.array(self.last_actions, copy=True)))
+        if len(self._buf) >= self.update_freq:
+            # concatena no eixo do batch: (K, n_envs, 84, 84, 1) -> (K*n_envs, 84, 84, 1)
+            b_s = torch.FloatTensor(np.concatenate([b[0] for b in self._buf], axis=0)).to(self.device) / 255.0
+            b_s = b_s.permute(0, 3, 1, 2)
+            b_ns = torch.FloatTensor(np.concatenate([b[1] for b in self._buf], axis=0)).to(self.device) / 255.0
+            b_ns = b_ns.permute(0, 3, 1, 2)
+            b_a = torch.LongTensor(np.concatenate([b[2] for b in self._buf])).to(self.device)
+            b_oh = F.one_hot(b_a, num_classes=self.action_space.n).float()
+            
+            pred_action_logits, pred_phi_t1, phi_t1_target = self.icm(b_s, b_ns, b_oh)
+            forward_error = F.mse_loss(pred_phi_t1, phi_t1_target, reduction='none').mean(dim=1)
+            
+            # Losses
+            inverse_loss = F.cross_entropy(pred_action_logits, b_a)
+            forward_loss = forward_error.mean()
+            
+            # Total ICM Loss
+            loss = (1.0 - self.forward_loss_weight) * inverse_loss + self.forward_loss_weight * forward_loss
+            
+            # Optimization step
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+            self._buf.clear()
         
         # Combine rewards
         total_rewards = rewards + intrinsic_rewards

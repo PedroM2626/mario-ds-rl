@@ -80,6 +80,13 @@ Em ambientes de topologia complexa, a ausência prolongada de recompensas extrí
 python src/train.py --timesteps 1000000 --num-envs 4 --use-icm
 ```
 
+**Treinos ICM executados (100k, família RecurrentPPO):**
+```bash
+python src/train_ppo_recurrent.py --timesteps 100000 --num-envs 4 --use-icm --icm-update-freq 8 --no-tensorboard --run-id ppo_icm_100k
+python src/train_ppo_recurrent.py --timesteps 100000 --num-envs 4 --use-icm --use-autoencoder --icm-update-freq 8 --no-tensorboard --run-id ppo_icm_ae_100k
+```
+*Notas de engenharia: `--icm-update-freq 8` batchiza o backward do ICM (a recompensa intrínseca continua calculada todo step — mesmo sinal, ~6x mais rápido); `--no-tensorboard` evita o import do TensorFlow que estourava a RAM; o `MLflowCallback` amostra `intrinsic_reward` a cada 50 steps (logar todo step derrubava o treino de ~29fps para ~4fps via commits SQLite). Tempos medidos: **ppo_icm_100k ≈ 48 min, ppo_icm_ae_100k ≈ 49 min** (4 envs, CUDA).*
+
 ---
 
 ### 4. Redes Residuais Convolucionais (ImpalaCNN)
@@ -145,6 +152,8 @@ Avaliamos rigorosamente todas as arquiteturas após o treinamento. Para garantir
 | Configuração (Modelo) | Média Recompensa | Desvio Padrão | Max Recompensa |
 | :--- | :---: | :---: | :---: |
 | **NE-Dreamer (100k steps)** | 378.78 | 179.61 | 847.52 |
+| **World Models GA: Encoder + LSTM + Alg. Genético (100k steps)** | 425.58 | 0.00 | 425.58 |
+| **World Models sep-CMA-ES: Encoder híbrido + LSTM + CMA-ES (104k steps)** | 242.69 | 0.00 | 242.69 |
 | **PPO Pure (100k steps)** | 13.10 | 0.00 | 13.10 |
 | **PPO SPR (100k steps)** | 254.34 | 0.00 | 254.34 |
 | **PPO CURL (100k steps)** | 105.00 | 0.00 | 105.00 |
@@ -161,6 +170,56 @@ Avaliamos rigorosamente todas as arquiteturas após o treinamento. Para garantir
 >    - **DrQ-v2 (74.92)** sofreu com o fato de que a augmentação espacial (shifts/crops) destruiu a precisão de sub-pixels necessária para navegação precisa no jogo em apenas 100k steps.
 > 4. **IMPALA Transformer SPR (1 Milhão):** Obteve um resultado fraco (74.74). Como notado na literatura de Transformers em RL, mecanismos de Atenção Cruzada Causal (Causal Attention) requerem datasets massivos para aprender o alinhamento. 1 Milhão de passos num ambiente online não foram suficientes para as matrizes de projeção do Transformer convirjam, gerando resultados sub-ótimos comparado ao LSTM do CURL.
 > 5. **PPO Puro (100k):** Falhou completamente (13.10), não saindo da tela inicial do jogo devido à severa ineficiência de amostra das CNNs tradicionais de RL.
+> 6. **World Models GA (100k):** O controlador linear evoluído sobre `[z (Encoder 512) + h (LSTM 256)]` obteve a **maior média em 100k (425.58)** com **desvio zero** — política determinística que sobrevive os 1000 steps do episódio em todas as 10 avaliações. Supera o NE-Dreamer na média, mas perde no pico (847.52) e na generalização: com apenas 4.614 parâmetros e sem gradiente, o GA explora pouco além do que já funciona (possível ótimo local). Ressalva metodológica: a avaliação usa teto de 1000 steps/episódio, então o valor reflete sobrevivência completa, não término natural da fase.
+> 7. **World Models sep-CMA-ES (104k):** Trocar o encoder VAE pelo híbrido AE+CURL e o GA pelo sep-CMA-ES **piorou a média (242.69)** — mas também com sobrevivência total (10×1000 steps) e desvio zero. Hipóteses: (a) as features contrastivas do CURL, boas para PPO com gradiente, descartam micro-sinais de movimento que o controlador linear evolutivo precisava; (b) o teto de 500 steps na evolução seleciona comportamento de curto prazo; (c) só 8 gerações limitaram a adaptação do step-size ($\sigma$: 0.08→0.079). Conclusão prática: para políticas lineares evolutivas, o encoder VAE puro foi melhor; CURL ajuda quem tem gradiente, não quem tem mutação.
+
+### 7. World Models com Algoritmo Genético (Encoder + Memória LSTM + GA)
+Alternativa inspirada em Ha & Schmidhuber (2018), em 3 camadas — e aqui vale o seu ponto: **o Autoencoder entra apenas como pré-treino; o que alimenta o RL é só o Encoder** (o decoder é descartado após o treino por reconstrução):
+* **V (Encoder visual):** o Encoder CNN pré-treinado (`models/autoencoder.pth`, 512 latentes) é congelado e usado como extrator puro de features.
+* **M (Memória):** uma LSTM (512+6 → 256) treinada de forma supervisionada a prever o próximo latente $z_{t+1}$ a partir de $(z_t, a_t)$ em 10k frames de política aleatória.
+* **C (Controlador genético):** um linear minúsculo $a = W[z;h]+b$ (4.614 params) evoluído com GA elitista (pop 24, mutação gaussiana $\sigma=0{.}05$), sem gradiente — orçamento restante de 90k steps.
+
+**Comando (100k steps totais = 10k memória + 90k GA):**
+```bash
+python src/train_worldmodels_ga.py --timesteps 100000 --mem-frames 10000 --pop-size 24 --run-id worldmodels_ga_100k
+```
+**Tempo de treino medido (wall-clock, GPU CUDA + 1 env CPU): 5510.9s = 91.8 min** — coleta 498.4s (~8.3 min) + treino LSTM 2.9s + evolução GA 5003.9s (~83.4 min). Artefatos: `models/worldmodels_ga_100k.npz` (controlador) e `models/worldmodels_ga_100k_memory.pth` (LSTM).
+
+### 8. World Models v2: Encoder Híbrido + sep-CMA-ES + Treino Paralelo
+Evolução do item 7 com as duas acelerações do item 2:
+* **V:** Encoder híbrido AE+CURL extraído de `models/ppo_hybrid_ae_curl_100k.zip` (custo zero — pesos já treinados).
+* **C:** sep-CMA-ES diagonal (NumPy; mesma matemática do `evosax`, sem instalar JAX+CUDA — o gargalo é o emulador, não a álgebra da evolução).
+* **Aceleração:** pool de 4 envs persistentes com init escalonado (padrão de `train_ppo_recurrent.py`), evolução com teto de 500 steps + validação full (1000) no top-3, coleta da memória reduzida para 5k.
+
+**Comando:**
+```bash
+python src/train_worldmodels_cma.py --timesteps 100000 --mem-frames 5000 --workers 4 --run-id worldmodels_cma_100k
+```
+**Tempo de treino medido: 2648.8s = 44.1 min (2.1× mais rápido que o v1)** — encoder 0.3s + coleta 241.2s (~4 min) + LSTM 3.8s + CMA-ES 8 gens 2039.3s (~34 min) + validação/avaliação. Env steps reais: 104.000 (5k + 96k + 3k — a última geração ultrapassa um pouco o orçamento). Artefatos: `models/worldmodels_cma_100k.npz` e `models/worldmodels_cma_100k_memory.pth`.
+
+### 9. Benchmark Unificado: 10 episódios determinísticos + 10 estocásticos
+Todas as alternativas SB3 foram reavaliadas com o mesmo protocolo (`src/evaluate_benchmark.py`, episódios completos, sem render, JSONs em `evals/`):
+
+| Modelo | Budget | det (média) | stoch (média ± std / max) |
+| :--- | :---: | :---: | :--- |
+| PPO Pure | 100k | 120.80 | 331.21 ± 171.39 / 684.92 |
+| PPO + Autoencoder | 100k | 74.77 | 199.93 ± 118.31 / 429.88 |
+| PPO CURL | 100k | 226.72 | 362.45 ± 152.44 / 711.47 |
+| PPO Híbrido AE+CURL | 100k | 74.74 | 249.19 ± 125.73 / 488.00 |
+| PPO SPR | 100k | 254.34 | 323.55 ± 68.95 / 464.04 |
+| PPO DrQ-v2 | 100k | 74.92 | 248.49 ± 106.25 / 425.54 |
+| **PPO + ICM** | 100k | 222.49 | 223.11 ± 114.45 / 402.33 |
+| **PPO + ICM + Autoencoder** | 100k | 74.77 | 235.13 ± 116.79 / 420.44 |
+| Recurrent PPO | longo | 31.74 | 540.75 ± 211.67 / **880.77** |
+| ImpalaCNN PPO | 1M | 74.74 | 181.16 ± 92.38 / 345.79 |
+
+> **Leituras:**
+> 1. **det tem std 0.00 sempre** (ambiente + política determinísticos): 10 eps det são 10 replays idênticos — por isso o modo stoch foi adicionado.
+> 2. **Cluster do "primeiro pit"**: ae_frozen, híbrido, icm_ae e impala morrem deterministicamente no mesmo ponto (~74.7 / 39 steps); o det não os separa, o stoch sim.
+> 3. **stoch ≥ det quase sempre** — ruído de exploração ajuda políticas subt reinadas a passar do primeiro obstáculo.
+> 4. **ICM fica no meio do pelotão** (222/235): não supera o SPR; no icm_ae o encoder domina e a curiosidade agrega pouco em 100k.
+> 5. **Validação do protocolo**: spr-det (254.34) e drq-det (74.92) reproduzem a tabela antiga exatamente; pure e curl divergem dela (protocolo det antigo desconhecido — linhas antigas mantidas como histórico).
+> 6. **Cuidado com n=10 stoch**: duas varreduras variaram ±50–100 na média — para rankings apertados use ≥30 episódios ou múltiplas seeds.
 
 Esses resultados comprovam a drástica superioridade das metodologias baseadas em **World Models (NE-Dreamer)** no quesito eficiência (Sample Efficiency), bem como o enorme impacto de usar regularizadores de dinâmica espacial (**CURL/SPR**) comparado à otimização extrínseca pura (PPO).
 
