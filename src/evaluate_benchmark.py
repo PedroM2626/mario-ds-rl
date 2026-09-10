@@ -33,6 +33,8 @@ MODELS = {
     "impala":    "models/mario_impala.zip",
     "icm":       "models/ppo_icm_100k.zip",
     "icm_ae":    "models/ppo_icm_ae_100k.zip",
+    "ram100k":   "models/ram_ppo_100k.zip",
+    "ramgeo100k": "models/ram_geo_100k.zip",
 }
 
 
@@ -115,11 +117,47 @@ def load_model(path):
             err_rec = e
     try:
         from stable_baselines3 import PPO
-        return PPO.load(path), "ppo"
+        m = PPO.load(path)
+        # MLP sobre vetor RAM vs CNN: distingue pela classe da policy
+        if type(m.policy).__name__ == "ActorCriticPolicy":
+            return m, "ram"
+        return m, "ppo"
     except Exception as e:
         err_ppo = e
     raise RuntimeError(f"Falha ao carregar {path} como RecurrentPPO ({err_rec}) "
                        f"e como PPO ({err_ppo})")
+
+
+def eval_ram(model, n_eps):
+    """Um unico env p/ det+stoch (2 DeSmuMEs no mesmo processo = crash nativo)."""
+    from ram_env import MarioRamEnv
+    geo = tuple(model.observation_space.shape) == (23,)
+    env = MarioRamEnv(geo=geo)
+    assert env.has_emulator, "emulador falhou no env RAM!"
+    out = {}
+    try:
+        for mode, det in (("det", True), ("stoch", False)):
+            rewards, steps_list = [], []
+            for _ in range(n_eps):
+                obs, _ = env.reset()
+                total, steps, done = 0.0, 0, False
+                while not done and steps < MAX_STEPS:
+                    action, _ = model.predict(obs, deterministic=det)
+                    obs, r, done, trunc, _ = env.step(
+                        int(action) if np.ndim(action) == 0 else int(action[0]))
+                    done = bool(done or trunc)
+                    total += float(r)
+                    steps += 1
+                rewards.append(total)
+                steps_list.append(steps)
+            out[mode] = {"rewards": rewards, "steps": steps_list,
+                         "mean": float(np.mean(rewards)),
+                         "std": float(np.std(rewards)),
+                         "max": float(np.max(rewards)),
+                         "mean_steps": float(np.mean(steps_list))}
+    finally:
+        env.close()
+    return out
 
 
 def eval_recurrent(model, env, n_eps, deterministic):
@@ -169,10 +207,29 @@ def main():
 
     results = {}
     # NUNCA dois DeSmuMEs vivos no mesmo processo (colisao nativa):
-    # fase recurrent com env cru, depois fecha e abre a fase framestack.
-    rec_names = [n for n in names if MODELS[n] != MODELS.get("impala")]
+    # fases sequenciais, cada uma com seu env proprio.
+    ram_names = [n for n in names if "ram_" in MODELS[n]]
+    rec_names = [n for n in names if MODELS[n] != MODELS.get("impala")
+                 and n not in ram_names]
     stk_names = [n for n in names if MODELS[n] == MODELS.get("impala")]
     t0 = time.time()
+    for name in ram_names:
+        path = MODELS[name]
+        if not os.path.exists(path):
+            print(f"[{name}] SKIP (sem arquivo: {path})", flush=True)
+            continue
+        model, kind = load_model(path)
+        assert kind == "ram", f"{name} nao e ram-mlp!"
+        print(f"[{name}] {kind} policy={type(model.policy).__name__} "
+              f"obs={model.observation_space.shape}", flush=True)
+        out = {"kind": kind, "path": path}
+        res = eval_ram(model, args.eps)
+        for mode in ("det", "stoch"):
+            out[mode] = res[mode]
+            print(f"[{name}/{mode}] media={res[mode]['mean']:.2f} std={res[mode]['std']:.2f} "
+                  f"max={res[mode]['max']:.2f} steps_medios={res[mode]['mean_steps']:.0f}", flush=True)
+        results[name] = out
+        del model
     env = None
     if rec_names:
         env = MarioNdsEnv(rom_path=ROM, state_path=STATE)  # unico env p/ recurrent

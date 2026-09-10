@@ -210,6 +210,8 @@ Todas as alternativas SB3 foram reavaliadas com o mesmo protocolo (`src/evaluate
 | PPO DrQ-v2 | 100k | 74.92 | 248.49 ± 106.25 / 425.54 |
 | **PPO + ICM** | 100k | 222.49 | 223.11 ± 114.45 / 402.33 |
 | **PPO + ICM + Autoencoder** | 100k | 74.77 | 235.13 ± 116.79 / 420.44 |
+| **PPO RAM-only (sem visão)** | 100k | 61.40 | 357.15 ± 297.62 / **955.10** |
+| **PPO RAM + geometria (pits)** | 100k | 61.40 | 388.16 ± 266.08 / 784.62 |
 | Recurrent PPO | longo | 31.74 | 540.75 ± 211.67 / **880.77** |
 | ImpalaCNN PPO | 1M | 74.74 | 181.16 ± 92.38 / 345.79 |
 
@@ -220,6 +222,48 @@ Todas as alternativas SB3 foram reavaliadas com o mesmo protocolo (`src/evaluate
 > 4. **ICM fica no meio do pelotão** (222/235): não supera o SPR; no icm_ae o encoder domina e a curiosidade agrega pouco em 100k.
 > 5. **Validação do protocolo**: spr-det (254.34) e drq-det (74.92) reproduzem a tabela antiga exatamente; pure e curl divergem dela (protocolo det antigo desconhecido — linhas antigas mantidas como histórico).
 > 6. **Cuidado com n=10 stoch**: duas varreduras variaram ±50–100 na média — para rankings apertados use ≥30 episódios ou múltiplas seeds.
+
+### 10. Mapa de RAM (EUR) e `reward_mode="ram"`
+Extração direta de variáveis via `emu.memory` (`src/ram_state.py`, busca em `src/ram_search.py`). O mapa US (TASVideos/DataCrystal) **não vale** para a ROM EUR — validado por busca diferencial + screenshots:
+
+| Endereço (EUR) | Variável | Status |
+| :--- | :--- | :---: |
+| `0x0209DC00` u8 | Vidas (5→4 na morte; cf. AR EUR `2209DC00`) | ✅ |
+| `0x02098240` / `0x020DCFA0` u32 | Câmera X absoluta (deadzone, congela no mapa) | ✅ |
+| `0x0209AE9C` u32 | Contador de atividade horizontal (sobe nas 2 direções, pausa na morte) | ✅ |
+| `0x021C1904`… s32 | Espelhos de velocidade (±6144 = ±1,5 px/frame em 20.12) | ✅ |
+| `0x021C1890` +`0x44/0x60/0x68` | **Objeto do Mario**: tipo `0x1C`, A=Y (arco de pulo, chão −480px), B=X | ✅ |
+| lista em `obj+0x38` | **Lista ligada circular de objetos** (inimigos linkam ao se aproximar) | ✅ |
+| `RamState.enemies()` | `[{type, dx, dy}]` em px — goomba validado: 164px→contato (~10px)→morte | ✅ |
+| `0x020DC968` u32 | Timer da fase em 20.12 (398.3 = HUD; linearidade validada) | ✅ |
+| `0x021C1908` s32 | Y-vel (curva de gravidade no pulo; `==0` ⟺ no chão, salvo 1 step no ápice) | ✅ |
+| `0x020A703C` u32 | Y complementar (experimental) | 🧪 |
+
+**Validação RAM vs optical flow** (mesmo rollout, 39 steps pré-morte): correlação do progresso acumulado **0,91**, mesma escala (câmera em 20.12 fixed point confirma `RAM_PX_PER_UNIT=1/4096` a 18%), **morte detectada 3 steps antes** (vidas caem no início da animação; o template só na tela preta). Custo: ~7 leituras/step (µs) vs ~50 ms de flow+ORB.
+
+**Uso:** `MarioNdsEnv(..., reward_mode="ram")` — mesma fórmula de recompensa, progresso pela câmera-RAM e morte pelas vidas (templates seguem como redundância). Default segue `"flow"` (todos os resultados publicados usam ele).
+
+### 11. Treino sem visão computacional (estilo NES/SMB)
+`src/ram_env.py` (`MarioRamEnv`): observação `Box(17)` pura de RAM, zero pixels/CNN —
+`[x, y, vx, vy, on_ground, lives, time, cam_x + 3×(dx, dy, tipo)]` (posições relativas ao reset, inimigos filtrados p/ tela). Done por vidas, timer zerado ou 1000 steps; mesma recompensa do env visual.
+
+**Prova de viabilidade** (`src/train_ram.py`, PPO `MlpPolicy`): smoke de 5000 steps em 308s (16,2 fps) evoluiu para treino completo de **100k steps (102.400 reais, 2 envs, 36,7 fps, 2725s = 45 min)**, `models/ram_ppo_100k.zip`:
+```bash
+python src/train_ram.py --timesteps 100000 --num-envs 2 --run-id ram_ppo_100k
+```
+
+**Comparativo RAM vs visão (100k, protocolo §9):** RAM det 61,40 (morre no pit como os visuais fracos) mas stoch **357,15 ± 297,62 / máx 955,10** — top-2 com o CURL (362,45) e **maior pico geral** (recurrent 880,77; Dreamer 847,52). Interpretação honesta: o vetor RAM cobre entidades dinâmicas mas **não a geometria estática** (pits/paredes são tiles, fora da RAM de estado) — o agente compensa **memorizando** o nível (spawn determinístico + X relativo). Conclusão: sem nenhum pixel, sem CNN, chega ao nível dos melhores métodos visuais em 100k — e o gap restante (det no pit) é exatamente onde a visão faz falta. Notas: `finish (+100)` segue pixel (fora do `ram_env`); pendentes p/ paridade NES/SMB total: powerup, level ID, moedas/score; 2 envs foi o ponto ótimo (4 envs têm contention: 10,7 fps).
+
+**Becos sem saída (registrados p/ não repetir)**: OAM só tem HUD (jogo renderiza Mario/inimigos em **3D**); scroll 2D (`0x040000xx`) zerado; shift US→EUR não é uniforme; morte volta ao **mapa-mundi** (não respawn); poke único de RAM é apagado pelo jogo (código AR escreve todo frame). A lista de objetos EUR foi resolvida via código AR "Big Jumps" (`021C1944`) + walk circular a partir do Mario. **Pendente agora**: X absoluto em pixels de tela (duas bases coerentes nos deltas), calibragem fina do Y e reward shaping com `enemies()` (ex.: penalidade por `dx` pequeno de Goomba/Koopa).
+
+### 12. Geometria da fase via ROM (pits, paredes, spawns — sem visão)
+Fases NSMB ficam em `course/X##_#.bin` + `_bgdat.bin` dentro da ROM (`src/course.py`, via `ndspy`; formato documentado pelo NSMBe/NSMB Central: tile objects `(obj, x, y, w, h)` em tiles, sprites 12B `(type, x, y)` em tiles, entrances 20B em pixels).
+Validações cruzadas RAM↔ROM na 1-1 (`A01_1`): spawn entrada (80, 464)px = Mario (88, pés 480) − meia-altura do sprite; chão na fileira 30 (= Y_RAM −480px); **pit no tile 30** (morte além do goomba); **goomba no tile 24 = 384px** (RAM o viu em 365px marchando p/ esquerda ✓); `?`-blocks nos tiles 18–23 (batem com screenshots).
+`MarioRamEnv(geo=True)` anexa 6 flags de pit (`pit_ahead`, colunas +1..+6, obs 17→23); treino `ram_geo_100k` (102.400 steps, 2 envs, 36,1 fps, 2768s = 46 min):
+```bash
+python src/train_ram.py --timesteps 100000 --num-envs 2 --geo --run-id ram_geo_100k
+```
+Resultado honesto: stoch 388,16 (vs 357,15 sem geo — empate técnico dentro do ruído ±270) e det ainda 61,40 no pit. As flags informam *que* há pit à frente, mas 100k steps de MLP não converteram isso em pulo cronometrado — geometria estática ajuda menos que entidades dinâmicas nesse budget; próximo teste seria janela de ocupação mais rica ou reward shaping por proximidade do pit.
 
 Esses resultados comprovam a drástica superioridade das metodologias baseadas em **World Models (NE-Dreamer)** no quesito eficiência (Sample Efficiency), bem como o enorme impacto de usar regularizadores de dinâmica espacial (**CURL/SPR**) comparado à otimização extrínseca pura (PPO).
 

@@ -12,6 +12,7 @@ models/*sanity*
 
 # Logs e listagens geradas (regeneraveis; resultados oficiais vao em evals/*.json)
 *.log
+ram_search.npz
 eval_results.txt
 eval_run.log
 eval_test.log
