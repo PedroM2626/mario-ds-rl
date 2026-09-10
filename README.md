@@ -212,6 +212,7 @@ Todas as alternativas SB3 foram reavaliadas com o mesmo protocolo (`src/evaluate
 | **PPO + ICM + Autoencoder** | 100k | 74.77 | 235.13 ± 116.79 / 420.44 |
 | **PPO RAM-only (sem visão)** | 100k | 61.40 | 357.15 ± 297.62 / **955.10** |
 | **PPO RAM + geometria (pits)** | 100k | 61.40 | 388.16 ± 266.08 / 784.62 |
+| **PPO GNN relacional (grafo)** | 100k | 61.40 | 527.50 ± 362.69 / **1378.89** |
 | Recurrent PPO | longo | 31.74 | 540.75 ± 211.67 / **880.77** |
 | ImpalaCNN PPO | 1M | 74.74 | 181.16 ± 92.38 / 345.79 |
 
@@ -264,6 +265,13 @@ Validações cruzadas RAM↔ROM na 1-1 (`A01_1`): spawn entrada (80, 464)px = Ma
 python src/train_ram.py --timesteps 100000 --num-envs 2 --geo --run-id ram_geo_100k
 ```
 Resultado honesto: stoch 388,16 (vs 357,15 sem geo — empate técnico dentro do ruído ±270) e det ainda 61,40 no pit. As flags informam *que* há pit à frente, mas 100k steps de MLP não converteram isso em pulo cronometrado — geometria estática ajuda menos que entidades dinâmicas nesse budget; próximo teste seria janela de ocupação mais rica ou reward shaping por proximidade do pit.
+
+### 13. GNN relacional (MeanMPNN puro-torch, sem PyG/DGL)
+Com o ambiente totalmente observável por entidades, o baseline natural seguinte é relacional: `src/graph_env.py` monta grafo de 14 nós (Mario + ≤5 inimigos + ≤8 retângulos estáticos da ROM) × 8 features `[dx, dy, w, h, is_mario, is_enemy, is_static, tipo]` + vetor global + máscara (obs `Box(134)`); `src/gnn_extractor.py` faz message passing 2× (média mascarada, grafo completo) + pool global — **invariante a permutação por construção** (o MLP ordenado por distância sofre descontinuidades em trocas de slot). Treino `gnn_100k` (102.400 steps, 2 envs, 34,9 fps, 2866s = 48 min):
+```bash
+python src/train_gnn.py --timesteps 100000 --num-envs 2 --run-id gnn_100k
+```
+Resultado: det 61,40 (pit, como toda a família RAM) mas stoch **527,50 ± 362,69 / máx 1378,89** — melhor pico geral (recurrent 880,77; RAM 955,10) e média no nível do recurrent (540,75). Leitura honesta: o viés relacional supera o MLP flat no jogo estocástico (527 vs 357/388), mas o ruído (±363, n=10) impede declarar vitória definitiva; e nem o grafo salvou o det do pit.
 
 Esses resultados comprovam a drástica superioridade das metodologias baseadas em **World Models (NE-Dreamer)** no quesito eficiência (Sample Efficiency), bem como o enorme impacto de usar regularizadores de dinâmica espacial (**CURL/SPR**) comparado à otimização extrínseca pura (PPO).
 

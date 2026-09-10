@@ -35,6 +35,7 @@ MODELS = {
     "icm_ae":    "models/ppo_icm_ae_100k.zip",
     "ram100k":   "models/ram_ppo_100k.zip",
     "ramgeo100k": "models/ram_geo_100k.zip",
+    "gnn100k":    "models/gnn_100k.zip",
 }
 
 
@@ -118,8 +119,11 @@ def load_model(path):
     try:
         from stable_baselines3 import PPO
         m = PPO.load(path)
-        # MLP sobre vetor RAM vs CNN: distingue pela classe da policy
+        # MLP sobre vetor RAM vs CNN: distingue pela classe da policy;
+        # GNN (grafo 134) vs MLP RAM (17/23) pela dim da obs.
         if type(m.policy).__name__ == "ActorCriticPolicy":
+            if tuple(m.observation_space.shape) == (134,):
+                return m, "gnn"
             return m, "ram"
         return m, "ppo"
     except Exception as e:
@@ -129,10 +133,22 @@ def load_model(path):
 
 
 def eval_ram(model, n_eps):
+    return _eval_box_env(model, n_eps, "ram")
+
+
+def eval_gnn(model, n_eps):
+    return _eval_box_env(model, n_eps, "gnn")
+
+
+def _eval_box_env(model, n_eps, kind):
     """Um unico env p/ det+stoch (2 DeSmuMEs no mesmo processo = crash nativo)."""
-    from ram_env import MarioRamEnv
-    geo = tuple(model.observation_space.shape) == (23,)
-    env = MarioRamEnv(geo=geo)
+    if kind == "gnn":
+        from graph_env import MarioGraphEnv
+        env = MarioGraphEnv()
+    else:
+        from ram_env import MarioRamEnv
+        geo = tuple(model.observation_space.shape) == (23,)
+        env = MarioRamEnv(geo=geo)
     assert env.has_emulator, "emulador falhou no env RAM!"
     out = {}
     try:
@@ -208,7 +224,7 @@ def main():
     results = {}
     # NUNCA dois DeSmuMEs vivos no mesmo processo (colisao nativa):
     # fases sequenciais, cada uma com seu env proprio.
-    ram_names = [n for n in names if "ram_" in MODELS[n]]
+    ram_names = [n for n in names if "ram_" in MODELS[n] or "gnn_" in MODELS[n]]
     rec_names = [n for n in names if MODELS[n] != MODELS.get("impala")
                  and n not in ram_names]
     stk_names = [n for n in names if MODELS[n] == MODELS.get("impala")]
@@ -219,11 +235,11 @@ def main():
             print(f"[{name}] SKIP (sem arquivo: {path})", flush=True)
             continue
         model, kind = load_model(path)
-        assert kind == "ram", f"{name} nao e ram-mlp!"
+        assert kind in ("ram", "gnn"), f"{name} nao e ram/gnn-mlp!"
         print(f"[{name}] {kind} policy={type(model.policy).__name__} "
               f"obs={model.observation_space.shape}", flush=True)
         out = {"kind": kind, "path": path}
-        res = eval_ram(model, args.eps)
+        res = eval_gnn(model, args.eps) if kind == "gnn" else eval_ram(model, args.eps)
         for mode in ("det", "stoch"):
             out[mode] = res[mode]
             print(f"[{name}/{mode}] media={res[mode]['mean']:.2f} std={res[mode]['std']:.2f} "
