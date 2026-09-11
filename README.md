@@ -197,32 +197,31 @@ python src/train_worldmodels_cma.py --timesteps 100000 --mem-frames 5000 --worke
 ```
 **Tempo de treino medido: 2648.8s = 44.1 min (2.1× mais rápido que o v1)** — encoder 0.3s + coleta 241.2s (~4 min) + LSTM 3.8s + CMA-ES 8 gens 2039.3s (~34 min) + validação/avaliação. Env steps reais: 104.000 (5k + 96k + 3k — a última geração ultrapassa um pouco o orçamento). Artefatos: `models/worldmodels_cma_100k.npz` e `models/worldmodels_cma_100k_memory.pth`.
 
-### 9. Benchmark Unificado: 10 episódios determinísticos + 10 estocásticos
-Todas as alternativas SB3 foram reavaliadas com o mesmo protocolo (`src/evaluate_benchmark.py`, episódios completos, sem render, JSONs em `evals/`):
+### 9. Benchmark Unificado: 10 episódios determinísticos + 30 estocásticos
+Todas as alternativas SB3 foram reavaliadas com o mesmo protocolo (`src/evaluate_benchmark.py --eps 10 --eps-stoch 30`, episódios completos, sem render, `evals/benchmark_n30_merged.json`). Avaliação paralelizável (`--workers N`, default 0 = sequencial seguro no sandbox; *workers órfãos do sandbox comem ~8GB de RAM — monitorar `Get-Process python`*).
 
-| Modelo | Budget | det (média) | stoch (média ± std / max) |
+| Modelo | Budget | det (média) | stoch n=30 (média ± std / max) |
 | :--- | :---: | :---: | :--- |
-| PPO Pure | 100k | 120.80 | 331.21 ± 171.39 / 684.92 |
-| PPO + Autoencoder | 100k | 74.77 | 199.93 ± 118.31 / 429.88 |
-| PPO CURL | 100k | 226.72 | 362.45 ± 152.44 / 711.47 |
-| PPO Híbrido AE+CURL | 100k | 74.74 | 249.19 ± 125.73 / 488.00 |
-| PPO SPR | 100k | 254.34 | 323.55 ± 68.95 / 464.04 |
-| PPO DrQ-v2 | 100k | 74.92 | 248.49 ± 106.25 / 425.54 |
-| **PPO + ICM** | 100k | 222.49 | 223.11 ± 114.45 / 402.33 |
-| **PPO + ICM + Autoencoder** | 100k | 74.77 | 235.13 ± 116.79 / 420.44 |
-| **PPO RAM-only (sem visão)** | 100k | 61.40 | 357.15 ± 297.62 / **955.10** |
-| **PPO RAM + geometria (pits)** | 100k | 61.40 | 388.16 ± 266.08 / 784.62 |
-| **PPO GNN relacional (grafo)** | 100k | 61.40 | 527.50 ± 362.69 / **1378.89** |
-| Recurrent PPO | longo | 31.74 | 540.75 ± 211.67 / **880.77** |
-| ImpalaCNN PPO | 1M | 74.74 | 181.16 ± 92.38 / 345.79 |
+| PPO Pure | 100k | 120.80 | 295.51 ± 80.93 / 437.83 |
+| PPO + Autoencoder | 100k | 74.77 | 234.27 ± 140.10 / 713.77 |
+| PPO CURL | 100k | 226.72 | 320.38 ± 139.19 / 704.05 |
+| PPO Híbrido AE+CURL | 100k | 74.74 | 286.14 ± 141.60 / 590.90 |
+| PPO SPR | 100k | 254.34 | 259.95 ± 112.75 / 495.76 |
+| **PPO + ICM** | 100k | 222.49 | 231.37 ± 94.60 / 402.75 |
+| **PPO + ICM + Autoencoder** | 100k | 74.77 | 230.09 ± 99.38 / 394.63 |
+| **PPO DrQ-v2** | 100k | 74.92 | 214.82 ± 105.80 / 434.91 |
+| **PPO RAM-only (sem visão)** | 100k | 61.40 | 392.39 ± 223.91 / 1001.80 |
+| **PPO RAM + geometria (pits)** | 100k | 61.40 | 521.95 ± 425.36 / **1538.48** |
+| **PPO GNN relacional (grafo)** | 100k | 61.40 | 401.11 ± 312.21 / 1311.86 |
+| Recurrent PPO | longo | 31.74 | 516.80 ± 131.04 / 771.03 |
+| ImpalaCNN PPO | 1M | 74.74 | 290.16 ± 161.17 / 686.32 |
 
 > **Leituras:**
-> 1. **det tem std 0.00 sempre** (ambiente + política determinísticos): 10 eps det são 10 replays idênticos — por isso o modo stoch foi adicionado.
-> 2. **Cluster do "primeiro pit"**: ae_frozen, híbrido, icm_ae e impala morrem deterministicamente no mesmo ponto (~74.7 / 39 steps); o det não os separa, o stoch sim.
-> 3. **stoch ≥ det quase sempre** — ruído de exploração ajuda políticas subt reinadas a passar do primeiro obstáculo.
-> 4. **ICM fica no meio do pelotão** (222/235): não supera o SPR; no icm_ae o encoder domina e a curiosidade agrega pouco em 100k.
+> 1. **det tem std 0.00 sempre** (ambiente + política determinísticos): 1 ep det bastaria; mantidos 10 por compatibilidade.
+> 2. **Cluster do "primeiro pit"**: ae_frozen, híbrido, icm_ae e impala morrem deterministicamente no mesmo ponto (~74.7 / 39 steps); o det não os separa, o stoch sim. A causa raiz é um **goomba** (RAM: dx 164px→contato→morte), não o pit.
+> 3. **n=30 mudou o ranking do n=10**: ram_geo (521,95) e recurrent (516,80) lideram; SPR caiu (259,95). SEM com n=30 ≈ std/5,5 (ainda ±20–75) — n=100 daria ±10–40 mas custa 3× (~6h).
+> 4. **ICM fica no meio do pelotão** (231/230): não supera o SPR; no icm_ae o encoder domina e a curiosidade agrega pouco em 100k.
 > 5. **Validação do protocolo**: spr-det (254.34) e drq-det (74.92) reproduzem a tabela antiga exatamente; pure e curl divergem dela (protocolo det antigo desconhecido — linhas antigas mantidas como histórico).
-> 6. **Cuidado com n=10 stoch**: duas varreduras variaram ±50–100 na média — para rankings apertados use ≥30 episódios ou múltiplas seeds.
 
 ### 10. Mapa de RAM (EUR) e `reward_mode="ram"`
 Extração direta de variáveis via `emu.memory` (`src/ram_state.py`, busca em `src/ram_search.py`). O mapa US (TASVideos/DataCrystal) **não vale** para a ROM EUR — validado por busca diferencial + screenshots:
@@ -253,7 +252,9 @@ Extração direta de variáveis via `emu.memory` (`src/ram_state.py`, busca em `
 python src/train_ram.py --timesteps 100000 --num-envs 2 --run-id ram_ppo_100k
 ```
 
-**Comparativo RAM vs visão (100k, protocolo §9):** RAM det 61,40 (morre no pit como os visuais fracos) mas stoch **357,15 ± 297,62 / máx 955,10** — top-2 com o CURL (362,45) e **maior pico geral** (recurrent 880,77; Dreamer 847,52). Interpretação honesta: o vetor RAM cobre entidades dinâmicas mas **não a geometria estática** (pits/paredes são tiles, fora da RAM de estado) — o agente compensa **memorizando** o nível (spawn determinístico + X relativo). Conclusão: sem nenhum pixel, sem CNN, chega ao nível dos melhores métodos visuais em 100k — e o gap restante (det no pit) é exatamente onde a visão faz falta. Notas: `finish (+100)` segue pixel (fora do `ram_env`); pendentes p/ paridade NES/SMB total: powerup, level ID, moedas/score; 2 envs foi o ponto ótimo (4 envs têm contention: 10,7 fps).
+**Comparativo RAM vs visão (100k, protocolo §9, n=30):** RAM det 61,40 (morre no goomba como os visuais fracos) mas stoch **392,39 ± 223,91 / máx 1001,80** — top-3 com recurrent (516,80) e ram_geo (521,95). Interpretação honesta: o vetor RAM cobre entidades dinâmicas mas **não a geometria estática** (pits/paredes são tiles, fora da RAM de estado) — o agente compensa **memorizando** o nível (spawn determinístico + X relativo). Conclusão: sem nenhum pixel, sem CNN, chega ao nível dos melhores métodos visuais em 100k. Notas: `finish (+100)` segue pixel (fora do `ram_env`); pendentes p/ paridade NES/SMB total: powerup, level ID, moedas/score.
+
+**Velocidade de treino (fps SB3, gargalo = emulador):** RAM 1/2/4 envs = 20/39/63 fps (escala quase-linear); CV recurrent ≈ 29–35 fps; GNN ≈ 35 fps; ICM ≈ 24–35 fps. Ou seja: CV vs vetor vs grafo **empatam** (rede neural é ruído perto do step do emulador); o que manda é nº de envs. Correção: medição antiga dizia "4 envs têm contention (10,7 fps)" — era artefato do print (dividia steps *requisitados* pelo tempo, ignorando o arredondamento do rollout SB3).
 
 **Becos sem saída (registrados p/ não repetir)**: OAM só tem HUD (jogo renderiza Mario/inimigos em **3D**); scroll 2D (`0x040000xx`) zerado; shift US→EUR não é uniforme; morte volta ao **mapa-mundi** (não respawn); poke único de RAM é apagado pelo jogo (código AR escreve todo frame). A lista de objetos EUR foi resolvida via código AR "Big Jumps" (`021C1944`) + walk circular a partir do Mario. **Pendente agora**: X absoluto em pixels de tela (duas bases coerentes nos deltas), calibragem fina do Y e reward shaping com `enemies()` (ex.: penalidade por `dx` pequeno de Goomba/Koopa).
 
@@ -264,14 +265,14 @@ Validações cruzadas RAM↔ROM na 1-1 (`A01_1`): spawn entrada (80, 464)px = Ma
 ```bash
 python src/train_ram.py --timesteps 100000 --num-envs 2 --geo --run-id ram_geo_100k
 ```
-Resultado honesto: stoch 388,16 (vs 357,15 sem geo — empate técnico dentro do ruído ±270) e det ainda 61,40 no pit. As flags informam *que* há pit à frente, mas 100k steps de MLP não converteram isso em pulo cronometrado — geometria estática ajuda menos que entidades dinâmicas nesse budget; próximo teste seria janela de ocupação mais rica ou reward shaping por proximidade do pit.
+Resultado honesto: stoch 521,95 (vs 392,39 sem geo — acima, mas dentro do ruído ±425/±224) e det ainda 61,40 no goomba. As flags informam *que* há pit à frente, mas 100k steps de MLP não converteram isso em vantagem decisiva — geometria estática ajuda menos que entidades dinâmicas nesse budget; próximo teste seria janela de ocupação mais rica ou reward shaping por proximidade do pit.
 
 ### 13. GNN relacional (MeanMPNN puro-torch, sem PyG/DGL)
 Com o ambiente totalmente observável por entidades, o baseline natural seguinte é relacional: `src/graph_env.py` monta grafo de 14 nós (Mario + ≤5 inimigos + ≤8 retângulos estáticos da ROM) × 8 features `[dx, dy, w, h, is_mario, is_enemy, is_static, tipo]` + vetor global + máscara (obs `Box(134)`); `src/gnn_extractor.py` faz message passing 2× (média mascarada, grafo completo) + pool global — **invariante a permutação por construção** (o MLP ordenado por distância sofre descontinuidades em trocas de slot). Treino `gnn_100k` (102.400 steps, 2 envs, 34,9 fps, 2866s = 48 min):
 ```bash
 python src/train_gnn.py --timesteps 100000 --num-envs 2 --run-id gnn_100k
 ```
-Resultado: det 61,40 (pit, como toda a família RAM) mas stoch **527,50 ± 362,69 / máx 1378,89** — melhor pico geral (recurrent 880,77; RAM 955,10) e média no nível do recurrent (540,75). Leitura honesta: o viés relacional supera o MLP flat no jogo estocástico (527 vs 357/388), mas o ruído (±363, n=10) impede declarar vitória definitiva; e nem o grafo salvou o det do pit.
+Resultado: det 61,40 (goomba, como toda a família RAM) mas stoch **401,11 ± 312,21 / máx 1311,86** — top-3 (recurrent 516,80; ram_geo 521,95) e pico entre os maiores (ram_geo 1538,48). Leitura honesta: o viés relacional supera o MLP flat (401 vs 392) por pouco; com n=30 o ruído (±312) ainda impede declarar vitória, e nem o grafo salvou o det do goomba.
 
 Esses resultados comprovam a drástica superioridade das metodologias baseadas em **World Models (NE-Dreamer)** no quesito eficiência (Sample Efficiency), bem como o enorme impacto de usar regularizadores de dinâmica espacial (**CURL/SPR**) comparado à otimização extrínseca pura (PPO).
 

@@ -80,7 +80,8 @@ def main():
         model.save(f"models/{args.run_id}")
         mlflow.log_artifact(f"models/{args.run_id}.zip")
     dt = time.time() - t0
-    print(f"RAM-ONLY: {args.timesteps} steps em {dt:.0f}s ({args.timesteps/dt:.1f} fps)", flush=True)
+    real = model.num_timesteps
+    print(f"RAM-ONLY: {real} steps reais em {dt:.0f}s ({real/dt:.1f} fps)", flush=True)
     env.close()
 
 
