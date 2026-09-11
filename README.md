@@ -161,7 +161,7 @@ Avaliamos rigorosamente todas as arquiteturas após o treinamento. Para garantir
 | **IMPALA Transformer SPR (1M steps)** | 74.74 | 0.00 | 74.74 |
 | **IMPALA CURL Recurrent (1M steps)** | 324.79 | 0.00 | 324.79 |
 
-> **Análise Técnica Detalhada:**
+> **Análise Técnica Detalhada (tabela antiga, protocolo det-10 — ver §9 p/ números atuais):**
 > 1. **NE-Dreamer (100k):** O algoritmo baseado em World Models apresentou a **maior média de recompensa geral (378.78)** e o **maior pico (847.52)** em apenas 100 mil interações. Como ele aprende a dinâmica do mundo de forma não-supervisionada (imaginando estados futuros) antes de otimizar a política, ele alcança uma eficiência de amostra incrivelmente superior ao PPO puro, embora seu comportamento seja mais instável (Desvio Padrão de 179.61).
 > 2. **IMPALA CURL (1 Milhão):** O modelo mais robusto dentre os baseados em model-free (PPO ImpalaCNN). Alcançou uma excelente consistência (324.79 de média sem sofrer penalidades de travamento). A convolução avançada (IMPALA) aliada ao aprendizado contrastivo temporal (CURL) gerou uma política incrivelmente estável, superando a arquitetura base.
 > 3. **PPO SPR vs PPO CURL vs DrQ-v2 (100k):** Ao comparar as representações auxiliares na marca de 100k:
@@ -274,7 +274,7 @@ python src/train_gnn.py --timesteps 100000 --num-envs 2 --run-id gnn_100k
 ```
 Resultado: det 61,40 (goomba, como toda a família RAM) mas stoch **401,11 ± 312,21 / máx 1311,86** — top-3 (recurrent 516,80; ram_geo 521,95) e pico entre os maiores (ram_geo 1538,48). Leitura honesta: o viés relacional supera o MLP flat (401 vs 392) por pouco; com n=30 o ruído (±312) ainda impede declarar vitória, e nem o grafo salvou o det do goomba.
 
-Esses resultados comprovam a drástica superioridade das metodologias baseadas em **World Models (NE-Dreamer)** no quesito eficiência (Sample Efficiency), bem como o enorme impacto de usar regularizadores de dinâmica espacial (**CURL/SPR**) comparado à otimização extrínseca pura (PPO).
+Esses resultados (tabela antiga, protocolo det-10) sugeriam superioridade das metodologias baseadas em **World Models (NE-Dreamer)** em eficiência amostral; o benchmark unificado da §9 (n=30 stoch) revisa o quadro — ver leituras lá.
 
 ---
 

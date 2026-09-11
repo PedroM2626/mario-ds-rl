@@ -10,3 +10,4 @@ tensorboard==2.16.2
 sheeprl==0.5.7
 setuptools==80.10.2
 sb3-contrib==2.2.1
+ndspy==4.2.0
