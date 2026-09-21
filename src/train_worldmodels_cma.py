@@ -1,19 +1,19 @@
 """
-World Models GA v2 para Mario DS:
-  V: Encoder HIBRIDO (AE pre-treino + CURL online) extraido de
-     models/ppo_hybrid_ae_curl_100k.zip  (ou --encoder autoencoder p/ baseline VAE)
-  M: LSTM prevendo z_{t+1} | (z_t, a_t)
-  C: sep-CMA-ES (CMA-ES diagonal, Ros & Hansen 2008) em vez de GA simples
+World Models GA v2 for Mario DS:
+  V: HYBRID Encoder (pretrained AE + online CURL) extracted from
+     models/ppo_hybrid_ae_curl_100k.zip  (or --encoder autoencoder for VAE baseline)
+  M: LSTM predicting z_{t+1} | (z_t, a_t)
+  C: sep-CMA-ES (diagonal CMA-ES, Ros & Hansen 2008) replacing simple GA
 
-Aceleracoes (item 2):
-  - avaliacoes da populacao em pool de envs paralelos (--workers)
-  - evolucao com teto curto (--evo-cap 500) + validacao full (--full-steps 1000) no top-3
-  - V vem pronto do modelo hibrido (custo zero); M usa --mem-frames reduzidos
+Accelerations:
+  - Population evaluations across parallel environments pool (--workers)
+  - Evolution with truncated cap (--evo-cap 500) + full validation (--full-steps 1000) on top-3
+  - V extracted directly from hybrid model (zero extra cost); M uses reduced --mem-frames
 
-Orcamento padrao 100k: mem-frames (5k) + evolucao (92k) + validacao top-3 (3k).
-A avaliacao final de 10 episodios (full-steps) e extra, como no v1.
+Standard 100k budget: mem-frames (5k) + evolution (92k) + top-3 validation (3k).
+The final 10-episode evaluation (full-steps) is supplementary, matching v1.
 
-Uso:
+Usage:
   python src/train_worldmodels_cma.py --timesteps 100000 --workers 4 --run-id worldmodels_cma_100k
   python src/train_worldmodels_cma.py --test-run
 """
@@ -41,42 +41,42 @@ HYBRID_PREFIX = "features_extractor.encoder."
 
 def load_encoder(source, device, hybrid_path="models/ppo_hybrid_ae_curl_100k.zip",
                  ae_path="models/autoencoder.pth"):
-    """Carrega o ENCODER (so ele) e congela. Retorna (vision, tag)."""
+    """Loads the ENCODER (only) and freezes it. Returns (vision, tag)."""
     t0 = time.time()
     vision = wm.VisionEncoder().to(device)
     tag = source
     if source == "hybrid" and os.path.exists(hybrid_path):
-        print(f"[V] Extraindo encoder hibrido AE+CURL de {hybrid_path} ...", flush=True)
+        print(f"[V] Extracting hybrid AE+CURL encoder from {hybrid_path} ...", flush=True)
         with zipfile.ZipFile(hybrid_path) as z:
             buf = io.BytesIO(z.read("policy.pth"))
         sd = torch.load(buf, map_location="cpu")
         enc_sd = {k.replace(HYBRID_PREFIX, "encoder."): v
                   for k, v in sd.items() if k.startswith(HYBRID_PREFIX)}
-        assert len(enc_sd) == 8, f"chaves inesperadas: {len(enc_sd)}"
+        assert len(enc_sd) == 8, f"unexpected keys count: {len(enc_sd)}"
         vision.load_state_dict(enc_sd)
-        print("[V] Encoder hibrido (pi/vf/shared -> shared) carregado.", flush=True)
+        print("[V] Hybrid encoder (pi/vf/shared -> shared) successfully loaded.", flush=True)
     else:
         if source == "hybrid":
-            print(f"[V] {hybrid_path} ausente, caindo p/ autoencoder.", flush=True)
+            print(f"[V] {hybrid_path} missing, falling back to autoencoder.", flush=True)
             tag = "autoencoder(fallback)"
         vision = wm.load_vision(device, path=ae_path)
         return vision, tag
     for p in vision.parameters():
         p.requires_grad = False
     vision.eval()
-    print(f"[V] Vision pronta em {time.time()-t0:.1f}s [{tag}] (frozen, latent=512)", flush=True)
+    print(f"[V] Vision ready in {time.time()-t0:.1f}s [{tag}] (frozen, latent=512)", flush=True)
     return vision, tag
 
 
-# ---------------------------------------------------------------- workers paralelos
+# ---------------------------------------------------------------- parallel workers
 _G = {}
 
 
 def _worker_init(wid_counter, wid_lock, rom, state, enc_state, mem_state):
     import time as _time
     import torch as _t
-    # ID unico por worker + inicializacao escalonada: DeSmuMEs simultaneos
-    # colidem no Windows (mesmo padrao de train_ppo_recurrent.make_env)
+    # Unique ID per worker + staggered initialization: concurrent DeSmuMEs
+    # collide on Windows (same pattern as train_ppo_recurrent.make_env)
     with wid_lock:
         wid = int(wid_counter.value)
         wid_counter.value = wid + 1
@@ -97,7 +97,7 @@ def _worker_init(wid_counter, wid_lock, rom, state, enc_state, mem_state):
             _G["env"].reset()
             last_err = None
             break
-        except Exception as e:  # noqa: BLE001 - DeSmuME nativo pode falhar sob contencao
+        except Exception as e:  # noqa: BLE001 - native DeSmuME may fail under contention
             last_err = e
             _time.sleep(5.0)
     if last_err is not None:
@@ -128,7 +128,7 @@ def _worker_init(wid_counter, wid_lock, rom, state, enc_state, mem_state):
 
 
 def _eval_vec(vec, max_steps):
-    """1 episodio com o controlador linear. Retorna (fitness, steps)."""
+    """1 episode with linear controller. Returns (fitness, steps)."""
     W, b = wm.vec_to_params(np.asarray(vec, dtype=np.float64))
     env, vision, memory, device = _G["env"], _G["vision"], _G["memory"], _G["device"]
     obs, _ = env.reset()
@@ -154,7 +154,7 @@ def _eval_vec(vec, max_steps):
 # ---------------------------------------------------------------- sep-CMA-ES
 def sep_cma_optimize(pool, dim, budget_steps, evo_cap, pop_size=24, sigma0=0.08,
                      seed=0, mlflow=None):
-    """sep-CMA-ES (diagonal). Avaliacoes via pool. Retorna (archive, used, gens, time)."""
+    """sep-CMA-ES (diagonal). Evaluations via pool. Returns (archive, used, gens, time)."""
     rng = np.random.default_rng(seed)
     lam, mu = pop_size, pop_size // 2
     w = np.log(mu + 0.5) - np.log(np.arange(1, mu + 1))
@@ -217,21 +217,21 @@ def sep_cma_optimize(pool, dim, budget_steps, evo_cap, pop_size=24, sigma0=0.08,
 
 # ---------------------------------------------------------------- main
 def main():
-    ap = argparse.ArgumentParser(description="World Models v2: encoder hibrido + LSTM + sep-CMA-ES")
-    ap.add_argument("--rom", type=str, default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).nds")
-    ap.add_argument("--state", type=str, default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).ds1")
-    ap.add_argument("--timesteps", type=int, default=100000)
-    ap.add_argument("--mem-frames", type=int, default=5000)
-    ap.add_argument("--val-reserve", type=int, default=3000)
-    ap.add_argument("--workers", type=int, default=4)
-    ap.add_argument("--pop-size", type=int, default=24)
-    ap.add_argument("--evo-cap", type=int, default=500)
-    ap.add_argument("--full-steps", type=int, default=1000)
-    ap.add_argument("--encoder", type=str, default="hybrid", choices=["hybrid", "autoencoder"])
-    ap.add_argument("--sigma0", type=float, default=0.08)
-    ap.add_argument("--run-id", type=str, default="worldmodels_cma_100k")
-    ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--test-run", action="store_true")
+    ap = argparse.ArgumentParser(description="World Models v2: hybrid encoder + LSTM + sep-CMA-ES")
+    ap.add_argument("--rom", type=str, default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).nds", help="Path to ROM")
+    ap.add_argument("--state", type=str, default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).ds1", help="Path to savestate")
+    ap.add_argument("--timesteps", type=int, default=100000, help="Total environment steps")
+    ap.add_argument("--mem-frames", type=int, default=5000, help="Steps for memory LSTM training")
+    ap.add_argument("--val-reserve", type=int, default=3000, help="Steps reserved for top-3 validation")
+    ap.add_argument("--workers", type=int, default=4, help="Number of parallel worker environments")
+    ap.add_argument("--pop-size", type=int, default=24, help="Population size for CMA-ES")
+    ap.add_argument("--evo-cap", type=int, default=500, help="Max episode steps during evolution")
+    ap.add_argument("--full-steps", type=int, default=1000, help="Full episode steps for top validation/eval")
+    ap.add_argument("--encoder", type=str, default="hybrid", choices=["hybrid", "autoencoder"], help="Vision encoder source")
+    ap.add_argument("--sigma0", type=float, default=0.08, help="Initial mutation step size")
+    ap.add_argument("--run-id", type=str, default="worldmodels_cma_100k", help="Run identifier / model name")
+    ap.add_argument("--seed", type=int, default=0, help="Random seed")
+    ap.add_argument("--test-run", action="store_true", help="Quick sanity run (~3k steps)")
     args = ap.parse_args()
 
     if args.test_run:
@@ -241,8 +241,8 @@ def main():
     assert args.mem_frames + args.val_reserve < args.timesteps
     evo_budget = args.timesteps - args.mem_frames - args.val_reserve
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device} | Orcamento: total={args.timesteps} "
-          f"(mem={args.mem_frames} + cma={evo_budget} + valid={args.val_reserve}) "
+    print(f"Device: {device} | Budget: total={args.timesteps} "
+          f"(mem={args.mem_frames} + cma={evo_budget} + val={args.val_reserve}) "
           f"| workers={args.workers}", flush=True)
     total_t0 = time.time()
 
@@ -259,12 +259,12 @@ def main():
                                  "evo_cap": args.evo_cap, "full_steps": args.full_steps,
                                  "encoder_src": args.encoder}[k])
 
-        # V (custo zero: pesos ja treinados)
+        # V (zero extra cost: pretrained weights)
         t_v = time.time()
         vision, enc_tag = load_encoder(args.encoder, device)
         v_time = time.time() - t_v
 
-        # M: coleta sequencial c/ 1 env local + treino LSTM na GPU
+        # M: sequential collection with 1 local env + LSTM training on GPU
         ga_env = MarioNdsEnv(rom_path=args.rom, state_path=args.state)
         frames, actions, dones, collect_time = wm.collect_sequential_data(
             ga_env, args.mem_frames, seed=args.seed)
@@ -277,7 +277,7 @@ def main():
         ga_env.close()
         del ga_env, frames
 
-        # C: pool paralelo de envs persistentes (init escalonado anti-colisao)
+        # C: parallel pool of persistent envs (staggered anti-collision init)
         from multiprocessing import Lock, Value
         enc_state = {k: v.cpu() for k, v in vision.encoder.state_dict().items()}
         mem_state = {k: v.cpu() for k, v in memory.state_dict().items()}
@@ -291,7 +291,7 @@ def main():
                 pool, dim, evo_budget, args.evo_cap, pop_size=args.pop_size,
                 sigma0=args.sigma0, seed=args.seed, mlflow=mlflow)
 
-            # Validacao full do top-3 (cap curto pode embaralhar o ranking)
+            # Full validation of top-3 candidates (short cap can perturb rankings)
             archive.sort(key=lambda t: -t[0])
             cands = [v for _, v in archive[:3]]
             val = list(pool.map(_eval_vec, cands, [args.full_steps] * len(cands)))
@@ -299,11 +299,11 @@ def main():
             bi = int(np.argmax([f for f, _ in val]))
             best_vec, best_val = cands[bi], float(val[bi][0])
             print(f"[VAL] top-3@{args.full_steps}: {[f'{f:.2f}' for f, _ in val]} "
-                  f"-> campeao={best_val:.2f}", flush=True)
+                  f"-> champion={best_val:.2f}", flush=True)
             mlflow.log_metric("val_best_full", best_val)
 
-            # Avaliacao final 10 episodios (protocolo do README), via pool
-            print("Avaliacao final (10 episodios)...", flush=True)
+            # Final 10-episode evaluation via pool
+            print("Final evaluation (10 episodes)...", flush=True)
             ev = list(pool.map(_eval_vec, [best_vec] * 10,
                                [args.full_steps] * 10))
             eval_steps = sum(c for _, c in ev)
@@ -311,7 +311,7 @@ def main():
                 print(f"  ep {i+1}: reward={f:.2f} steps={s}", flush=True)
 
         scores = np.array([f for f, _ in ev])
-        print(f"RESULTADO 10eps: media={scores.mean():.2f} std={scores.std():.2f} "
+        print(f"10-EPISODE RESULTS: mean={scores.mean():.2f} std={scores.std():.2f} "
               f"max={scores.max():.2f}", flush=True)
 
         np.savez(f"models/{args.run_id}.npz", W=wm.vec_to_params(best_vec)[0],
@@ -322,15 +322,15 @@ def main():
         total_time = time.time() - total_t0
         train_steps = args.mem_frames + evo_steps + val_steps
         print("=" * 60, flush=True)
-        print("TEMPO DE TREINAMENTO (wall-clock):", flush=True)
-        print(f"  Encoder (pronto) : {v_time:.1f}s", flush=True)
-        print(f"  Coleta memoria   : {collect_time:.1f}s", flush=True)
-        print(f"  Treino memoria   : {mem_train_time:.1f}s (GPU)", flush=True)
+        print("TRAINING WALL-CLOCK TIME:", flush=True)
+        print(f"  Encoder (ready)  : {v_time:.1f}s", flush=True)
+        print(f"  Memory collection: {collect_time:.1f}s", flush=True)
+        print(f"  Memory training  : {mem_train_time:.1f}s (GPU)", flush=True)
         print(f"  CMA-ES ({gens} gens, {args.workers} workers): {cma_time:.1f}s", flush=True)
         print(f"  TOTAL            : {total_time:.1f}s = {total_time/60:.1f} min", flush=True)
-        print(f"  Env steps treino : {train_steps} (mem={args.mem_frames} + "
-              f"cma={evo_steps} + valid={val_steps})", flush=True)
-        print(f"  Campeao validado : {best_val:.2f}", flush=True)
+        print(f"  Env training steps: {train_steps} (mem={args.mem_frames} + "
+              f"cma={evo_steps} + val={val_steps})", flush=True)
+        print(f"  Validated champion: {best_val:.2f}", flush=True)
         print("=" * 60, flush=True)
         for k, v in [("wall_time_total_s", total_time), ("wall_time_cma_s", cma_time),
                      ("env_steps_train", train_steps),

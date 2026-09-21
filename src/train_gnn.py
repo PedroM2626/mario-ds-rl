@@ -1,4 +1,4 @@
-"""Treino PPO + GNN (extrator MeanMPNN puro-torch) sobre MarioGraphEnv."""
+"""PPO + GNN training (pure PyTorch MeanMPNN feature extractor) on MarioGraphEnv."""
 import argparse
 import os
 import sys
@@ -14,7 +14,7 @@ def make_env(rom_path, state_path, rank):
         import time as _t
         import shutil
         import tempfile
-        _t.sleep(rank * 2.0)  # init escalonado: DeSmuMEs simultaneos colidem
+        _t.sleep(rank * 2.0)  # Staggered init: concurrent DeSmuMEs collide
         tmp = tempfile.gettempdir()
         pid = os.getpid()
         t_rom = os.path.join(tmp, f"mario_gnn_rom_{rank}_{pid}.nds")
@@ -40,15 +40,15 @@ def make_env(rom_path, state_path, rank):
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--timesteps", type=int, default=100000)
-    ap.add_argument("--num-envs", type=int, default=2)
-    ap.add_argument("--run-id", type=str, default="gnn_100k")
-    ap.add_argument("--resume", type=str, default=None)
+    ap = argparse.ArgumentParser(description="Train PPO + GNN policy on MarioGraphEnv")
+    ap.add_argument("--timesteps", type=int, default=100000, help="Total environment steps")
+    ap.add_argument("--num-envs", type=int, default=2, help="Number of parallel environments")
+    ap.add_argument("--run-id", type=str, default="gnn_100k", help="Run identifier / model name")
+    ap.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume from (without .zip)")
     ap.add_argument("--rom", type=str,
-                    default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).nds")
+                    default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).nds", help="Path to ROM")
     ap.add_argument("--state", type=str,
-                    default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).ds1")
+                    default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).ds1", help="Path to savestate")
     args = ap.parse_args()
 
     import mlflow
@@ -65,11 +65,11 @@ def main():
         mlflow.log_param("model_type", "PPO_GNN_MeanMPNN")
         mlflow.log_param("total_timesteps", args.timesteps)
         mlflow.log_param("num_envs", args.num_envs)
-        mlflow.log_param("obs", f"Box({OBS_DIM}) grafo: 14 nos x 8 + global 8 + mask")
+        mlflow.log_param("obs", f"Box({OBS_DIM}) graph: 14 nodes x 8 + global 8 + mask")
         policy_kwargs = dict(features_extractor_class=GNNExtractor,
                              features_extractor_kwargs=dict(features_dim=256))
         if args.resume and os.path.exists(f"{args.resume}.zip"):
-            print(f"Resume de {args.resume}.zip", flush=True)
+            print(f"Resuming from {args.resume}.zip", flush=True)
             model = PPO.load(args.resume, env=env)
             model.learn(total_timesteps=args.timesteps, reset_num_timesteps=False)
         else:
@@ -81,7 +81,7 @@ def main():
         mlflow.log_artifact(f"models/{args.run_id}.zip")
     dt = time.time() - t0
     real = model.num_timesteps
-    print(f"GNN: {real} steps reais em {dt:.0f}s ({real/dt:.1f} fps)", flush=True)
+    print(f"GNN: {real} actual steps completed in {dt:.0f}s ({real/dt:.1f} fps)", flush=True)
     env.close()
 
 

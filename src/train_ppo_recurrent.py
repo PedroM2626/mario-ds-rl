@@ -68,9 +68,9 @@ def main():
     class MLflowCallback(BaseCallback):
         """
         Custom callback for logging to MLflow.
-        NOTA: metricas intrinsecas existem em TODO step (ICM) — logar cada uma
-        com mlflow.log_metric (1 commit SQLite por chamada) derruba o treino
-        de ~29fps p/ ~4fps. Por isso vao amostradas a cada 50 steps.
+        NOTE: Intrinsic metrics exist at EVERY step (ICM) — logging each one
+        with mlflow.log_metric (1 SQLite commit per call) drops training
+        from ~29fps to ~4fps. Therefore they are sampled every 50 steps.
         """
         def __init__(self, verbose=0):
             super().__init__(verbose)
@@ -165,7 +165,7 @@ def main():
     parser.add_argument("--use-autoencoder", action="store_true", help="Use pre-trained Autoencoder for vision")
     parser.add_argument("--use-impala", action="store_true", help="Use residual ImpalaCNN for vision")
     parser.add_argument("--use-icm", action="store_true", help="Use Intrinsic Curiosity Module (ICM)")
-    parser.add_argument("--icm-update-freq", type=int, default=1, help="ICM backward a cada K env-steps (1 = original; recompensa intrinseca calculada todo step)")
+    parser.add_argument("--icm-update-freq", type=int, default=1, help="ICM backward every K env-steps (1 = original; intrinsic reward computed every step)")
     parser.add_argument("--use-curl", action="store_true", help="Use CURL representation learning callback")
     parser.add_argument("--curl-lr", type=float, default=0.0001, help="Learning rate for CURL optimizer")
     parser.add_argument("--curl-batch-size", type=int, default=64, help="Batch size for CURL contrastive learning")
@@ -191,7 +191,7 @@ def main():
     parser.add_argument("--lr", type=float, default=0.0005, help="Learning rate for PPO training")
     parser.add_argument("--ent-coef", type=float, default=0.01, help="Entropy coefficient for PPO")
     parser.add_argument("--device", type=str, default="cuda", help="PyTorch device (cuda, cpu, auto)")
-    parser.add_argument("--no-tensorboard", action="store_true", help="Desativa o log TensorBoard (evita importar o TensorFlow; o MLflow continua ativo)")
+    parser.add_argument("--no-tensorboard", action="store_true", help="Disables TensorBoard logging (avoids importing TensorFlow; MLflow remains active)")
     args = parser.parse_args()
 
     # Create directories if they don't exist
@@ -222,8 +222,8 @@ def main():
         else:
             print("Initializing 1 environment via DummyVecEnv...")
             env = DummyVecEnv(env_fns)
-        # Sem Frame Stacking: Recurrent PPO já possui LSTM que cuida da dimensão temporal
-        # Recebe 1 frame (Canal de Cor: Grayscale) por vez.
+        # No Frame Stacking: Recurrent PPO uses an LSTM/Transformer that handles temporal dependencies
+        # Ingests 1 frame (Color channel: Grayscale) per step.
 
         if args.use_icm:
             from icm import ICMVecEnvWrapper
@@ -363,7 +363,7 @@ def main():
             reset_ts = False if args.resume else True
             model.learn(total_timesteps=timesteps, callback=callbacks, reset_num_timesteps=reset_ts)
         except KeyboardInterrupt:
-            print("\nTreinamento interrompido pelo usuário! Salvando o progresso atual...")
+            print("\nTraining interrupted by user! Saving current progress...")
         except RuntimeError as e:
             if "out of memory" in str(e).lower() and device_name == "cuda":
                 print("\n[WARNING] CUDA Out of Memory during training. Attempting to fall back to CPU...")

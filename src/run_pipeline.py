@@ -33,23 +33,23 @@ def update_readme():
     mlflow.set_tracking_uri("sqlite:///mlflow.db")
     client = MlflowClient()
     
-    # Mapeamento das runs para a tabela do README
+    # Mapping runs to README table rows
     run_mapping = {
         "ppo_pure_100k": "PPO Recurrent Pure (NatureCNN)",
         "ppo_autoencoder_frozen_100k": "Autoencoder Frozen",
         "ppo_curl_online_100k": "CURL Online",
-        "ppo_hybrid_ae_curl_100k": "Híbrido AE + CURL",
+        "ppo_hybrid_ae_curl_100k": "Hybrid AE + CURL",
         "ppo_drq_100k": "PPO Recurrent + DrQ-v2 (Random Shifts)",
         "ppo_spr_100k": "PPO Recurrent + SPR (Multi-step Latent)",
-        "ppo_transformer_spr_100k": "PPO Causal Transformer + SPR (Nova Arquitetura)"
+        "ppo_transformer_spr_100k": "PPO Causal Transformer + SPR (New Architecture)"
     }
     
     table_lines = [
-        "| Configuração | Episódios | Recompensa Média | Desvio Padrão | Recompensa Máxima |",
+        "| Configuration | Episodes | Mean Reward | Standard Deviation | Maximum Reward |",
         "| :--- | :---: | :---: | :---: | :---: |"
     ]
     
-    # Buscar runs do experimento
+    # Fetch runs from MLflow experiment
     try:
         experiment = client.get_experiment_by_name("Mario_NDS_RL")
         if experiment is not None:
@@ -62,7 +62,7 @@ def update_readme():
         
     results = {}
     for run in runs:
-        # Tentar obter o nome amigável da run
+        # Retrieve human-readable run name
         run_name = run.data.tags.get("mlflow.runName", "")
         if not run_name:
             run_name = run.data.params.get("run-id", run.data.params.get("run_id", ""))
@@ -70,7 +70,7 @@ def update_readme():
         if run_name in run_mapping:
             run_id = run.info.run_id
             try:
-                # Tentar carregar histórico da métrica episode_reward
+                # Load episode_reward metric history
                 history = client.get_metric_history(run_id, "episode_reward")
                 rewards = [m.value for m in history]
                 if len(rewards) > 0:
@@ -81,7 +81,7 @@ def update_readme():
                         "max": np.max(rewards)
                     }
                 else:
-                    # Obter a última métrica registrada
+                    # Get last recorded metric
                     mean_val = run.data.metrics.get("episode_reward", 0.0)
                     results[run_name] = {
                         "episodes": "N/A",
@@ -92,7 +92,7 @@ def update_readme():
             except Exception as e:
                 print(f"Warning: Error extracting metrics for {run_name}: {e}")
                 
-    # Fallback de dados históricos padrões (caso o MLflow SQLite tenha sido resetado)
+    # Historical defaults fallback (if local SQLite was reset)
     historical_defaults = {
         "ppo_pure_100k": {"episodes": 768, "mean": 236.95, "std": 120.16, "max": 837.56},
         "ppo_autoencoder_frozen_100k": {"episodes": 847, "mean": 228.61, "std": 118.50, "max": 732.37},
@@ -100,12 +100,12 @@ def update_readme():
         "ppo_hybrid_ae_curl_100k": {"episodes": 776, "mean": 226.53, "std": 124.50, "max": 778.52}
     }
     
-    # Mesclar com os dados padrões se necessário
+    # Merge with default fallback data if needed
     for name, data in historical_defaults.items():
         if name not in results:
             results[name] = data
             
-    # Construir linhas da tabela
+    # Build markdown table lines
     for run_name, label in run_mapping.items():
         if run_name in results:
             data = results[run_name]
@@ -115,7 +115,7 @@ def update_readme():
             max_val = f"{data['max']:.2f}"
             table_lines.append(f"| **{label}** | {ep} | {mean_val} | {std_val} | {max_val} |")
             
-    # Escrever no arquivo README.md
+    # Write to README.md
     readme_path = "README.md"
     if os.path.exists(readme_path):
         with open(readme_path, "r", encoding="utf-8") as f:
@@ -147,8 +147,8 @@ def main():
     print("Starting Sequential RL Pipeline Master Script")
     print("==================================================")
     
-    # 1. Executar a suite de benchmarks de 100k steps
-    print("\n>>> FASE 1: Rodando os Benchmarks de 100k steps...")
+    # 1. Execute 100k steps benchmark suite
+    print("\n>>> PHASE 1: Running 100k steps benchmarks...")
     benchmarks = [
         [sys.executable, "src/train_ppo_recurrent.py", "--timesteps", "100000", "--num-envs", "4", "--use-drq", "--run-id", "ppo_drq_100k"],
         [sys.executable, "src/train_ppo_recurrent.py", "--timesteps", "100000", "--num-envs", "4", "--use-spr", "--run-id", "ppo_spr_100k"],
@@ -161,15 +161,15 @@ def main():
         if not success:
             print(f"Warning: Benchmark {i+1} failed. Continuing pipeline regardless...")
             
-    # 2. Atualizar o README.md
-    print("\n>>> FASE 2: Atualizando a documentação (README.md)...")
+    # 2. Update README.md
+    print("\n>>> PHASE 2: Updating documentation (README.md)...")
     try:
         update_readme()
     except Exception as e:
         print(f"Error updating README.md: {e}")
         
-    # 3. Retomar o treino CURL até 1.0M steps
-    print("\n>>> FASE 3: Retomando treinamento CURL (impala_curl_recurrent_3m) até 1.0M steps...")
+    # 3. Resume CURL training up to 1.0M steps
+    print("\n>>> PHASE 3: Resuming CURL training (impala_curl_recurrent_3m) up to 1.0M steps...")
     checkpoint_path = "models/checkpoints/impala_curl_recurrent_3m_240000_steps"
     if os.path.exists(f"{checkpoint_path}.zip"):
         resume_cmd = [
@@ -187,8 +187,8 @@ def main():
     else:
         print(f"Error: Checkpoint not found at {checkpoint_path}.zip. Cannot resume CURL training.")
         
-    # 4. Executar novo treino de Causal Transformer + SPR por 1.0M steps
-    print("\n>>> FASE 4: Iniciando novo treinamento de 1.0M steps (Causal Transformer + SPR)...")
+    # 4. Execute Causal Transformer + SPR training for 1.0M steps
+    print("\n>>> PHASE 4: Starting 1.0M steps training (Causal Transformer + SPR)...")
     new_train_cmd = [
         sys.executable, "src/train_ppo_recurrent.py",
         "--timesteps", "1000000",

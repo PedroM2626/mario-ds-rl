@@ -63,10 +63,10 @@ class ICMModel(nn.Module):
 
 class ICMVecEnvWrapper(VecEnvWrapper):
     """
-    VecEnv Wrapper that trains an ICM module and adds intrinsic curiosity reward to the Extrinsic reward.
-    update_freq: a cada quantos env-steps roda o backward+optim (default 1 = original).
-    A recompensa intrinseca e calculada TODO step (mesmo sinal); so o treino e
-    batchizado — pratica padrao (updates em minibatch) e ~Nx mais rapido.
+    VecEnv Wrapper that trains an ICM module and adds intrinsic curiosity reward to the extrinsic reward.
+    update_freq: every how many env-steps to run backward+optim (default 1 = original).
+    Intrinsic reward is computed at EVERY step (same signal); only training is
+    batched — standard practice (minibatch updates) and ~Nx faster.
     """
     def __init__(self, venv, intrinsic_scale=0.1, forward_loss_weight=0.2, update_freq=1):
         super().__init__(venv)
@@ -80,7 +80,7 @@ class ICMVecEnvWrapper(VecEnvWrapper):
         
         self.prev_obs = None
         self.last_actions = None
-        self._buf = []  # transicoes acumuladas p/ update batchizado
+        self._buf = []  # accumulated transitions for batched updates
 
     def reset(self):
         obs = self.venv.reset()
@@ -105,7 +105,7 @@ class ICMVecEnvWrapper(VecEnvWrapper):
         actions_tensor = torch.LongTensor(self.last_actions).to(self.device)
         action_one_hot = F.one_hot(actions_tensor, num_classes=self.action_space.n).float()
         
-        # Recompensa intrinseca: forward SEM grad todo step (barato)
+        # Intrinsic reward: forward WITHOUT grad every step (cheap)
         with torch.no_grad():
             _, pred_phi_t1_nograd, phi_t1_target_nograd = self.icm(
                 state_tensor, next_state_tensor, action_one_hot)
@@ -113,11 +113,11 @@ class ICMVecEnvWrapper(VecEnvWrapper):
                 pred_phi_t1_nograd, phi_t1_target_nograd, reduction='none').mean(dim=1)
         intrinsic_rewards = forward_error_nograd.cpu().numpy() * self.intrinsic_scale
         
-        # Treino batchizado a cada update_freq steps
+        # Batched training every update_freq steps
         self._buf.append((self.prev_obs.copy(), np.array(obs, copy=True),
                           np.array(self.last_actions, copy=True)))
         if len(self._buf) >= self.update_freq:
-            # concatena no eixo do batch: (K, n_envs, 84, 84, 1) -> (K*n_envs, 84, 84, 1)
+            # Concatenate along batch dimension: (K, n_envs, 84, 84, 1) -> (K*n_envs, 84, 84, 1)
             b_s = torch.FloatTensor(np.concatenate([b[0] for b in self._buf], axis=0)).to(self.device) / 255.0
             b_s = b_s.permute(0, 3, 1, 2)
             b_ns = torch.FloatTensor(np.concatenate([b[1] for b in self._buf], axis=0)).to(self.device) / 255.0

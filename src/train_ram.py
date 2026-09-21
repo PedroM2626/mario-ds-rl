@@ -1,4 +1,4 @@
-"""Treino PPO 100% RAM (sem pixels/CNN): PPO MLP sobre MarioRamEnv."""
+"""100% RAM PPO training (zero pixels / no CNN): PPO MLP over MarioRamEnv."""
 import argparse
 import os
 import sys
@@ -13,7 +13,7 @@ def make_env(rom_path, state_path, rank, geo=False):
         import time as _t
         import shutil
         import tempfile
-        _t.sleep(rank * 2.0)  # init escalonado: DeSmuMEs simultaneos colidem
+        _t.sleep(rank * 2.0)  # Staggered init: concurrent DeSmuMEs collide
         tmp = tempfile.gettempdir()
         pid = os.getpid()
         t_rom = os.path.join(tmp, f"mario_ram_rom_{rank}_{pid}.nds")
@@ -39,18 +39,18 @@ def make_env(rom_path, state_path, rank, geo=False):
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--timesteps", type=int, default=100000)
-    ap.add_argument("--num-envs", type=int, default=4)
-    ap.add_argument("--run-id", type=str, default="ram_ppo_100k")
+    ap = argparse.ArgumentParser(description="Train PPO MLP on RAM observations (MarioRamEnv)")
+    ap.add_argument("--timesteps", type=int, default=100000, help="Total environment steps")
+    ap.add_argument("--num-envs", type=int, default=4, help="Number of parallel environments")
+    ap.add_argument("--run-id", type=str, default="ram_ppo_100k", help="Run identifier / model name")
     ap.add_argument("--resume", type=str, default=None,
-                    help="Modelo p/ continuar (ex. models/ram_ppo_100k sem .zip)")
+                    help="Path to model checkpoint to resume (e.g. models/ram_ppo_100k without .zip)")
     ap.add_argument("--rom", type=str,
-                    default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).nds")
+                    default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).nds", help="Path to ROM")
     ap.add_argument("--state", type=str,
-                    default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).ds1")
+                    default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).ds1", help="Path to savestate")
     ap.add_argument("--geo", action="store_true",
-                    help="+6 flags de pit da ROM (obs 17->23)")
+                    help="Append 6 ROM pit flags to observations (obs 17 -> 23)")
     args = ap.parse_args()
 
     import mlflow
@@ -70,7 +70,7 @@ def main():
         mlflow.log_param("obs", f"Box({env.observation_space.shape[0]}) RAM"
                          + ("+pit6" if args.geo else ""))
         if args.resume and os.path.exists(f"{args.resume}.zip"):
-            print(f"Resume de {args.resume}.zip", flush=True)
+            print(f"Resuming from {args.resume}.zip", flush=True)
             model = PPO.load(args.resume, env=env)
             model.learn(total_timesteps=args.timesteps, reset_num_timesteps=False)
         else:
@@ -81,7 +81,7 @@ def main():
         mlflow.log_artifact(f"models/{args.run_id}.zip")
     dt = time.time() - t0
     real = model.num_timesteps
-    print(f"RAM-ONLY: {real} steps reais em {dt:.0f}s ({real/dt:.1f} fps)", flush=True)
+    print(f"RAM-ONLY: {real} actual steps completed in {dt:.0f}s ({real/dt:.1f} fps)", flush=True)
     env.close()
 
 

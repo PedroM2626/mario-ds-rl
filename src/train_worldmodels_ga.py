@@ -1,20 +1,19 @@
 """
-World Models (Ha & Schmidhuber, 2018) simplificado para Mario DS — 3 camadas:
-  V (Vision/Encoder): Encoder CNN congelado pre-treinado VIA Autoencoder
-      (models/autoencoder.pth, latente 512). O Autoencoder (encoder+decoder)
-      foi so o metodo de pre-treino por reconstrucao; o decoder e descartado
-      e so o ENCODER vira extrator de features visuais para o RL.
-  M (Memory):  LSTM que prediz o proximo latente z_{t+1} dado (z_t, a_t)
-  C (Controller): controlador linear minisculo evoluido com Algoritmo Genetico
+World Models (Ha & Schmidhuber, 2018) simplified for Mario DS — 3 tiers:
+  V (Vision/Encoder): Frozen CNN encoder pretrained via Autoencoder
+      (models/autoencoder.pth, latent dim 512). The Autoencoder (encoder+decoder)
+      served strictly as the visual representation pretraining method; the decoder
+      is discarded and only the ENCODER acts as the visual feature extractor for RL.
+  M (Memory): LSTM predicting the next latent vector z_{t+1} given (z_t, a_t)
+  C (Controller): Compact linear controller evolved via Genetic Algorithm (GA)
 
-Orcamento total padrao: 100k env steps (comparavel aos baselines PPO_*_100k),
-divididos em:
-  --mem-frames : steps de coleta aleatoria p/ treinar a memoria (default 10k)
-  restante     : avaliacoes do GA (cada episodio conta no budget)
+Standard 100k total environment steps budget (comparable to PPO_*_100k baselines):
+  --mem-frames : random policy collection steps to train the memory LSTM (default 10k)
+  remainder    : GA evaluations (every episode counts towards budget)
 
-Uso:
+Usage:
   python src/train_worldmodels_ga.py --timesteps 100000 --mem-frames 10000 --pop-size 24 --run-id worldmodels_ga_100k
-  python src/train_worldmodels_ga.py --test-run   # sanity check rapido (~3k steps)
+  python src/train_worldmodels_ga.py --test-run   # quick sanity check (~3k steps)
 """
 import argparse
 import os
@@ -56,16 +55,16 @@ def load_vision(device, path="models/autoencoder.pth"):
     t0 = time.time()
     model = VisionEncoder().to(device)
     if os.path.exists(path):
-        print(f"[V] Carregando pesos do Autoencoder: {path}")
+        print(f"[V] Loading Autoencoder weights: {path}")
         sd = torch.load(path, map_location=device)
         enc_sd = {k.replace("encoder.", ""): v for k, v in sd.items() if k.startswith("encoder.")}
         model.encoder.load_state_dict(enc_sd)
     else:
-        print(f"[V] AVISO: {path} nao encontrado. Usando encoder aleatorio.")
+        print(f"[V] WARNING: {path} not found. Using randomly initialized encoder.")
     for p in model.parameters():
         p.requires_grad = False
     model.eval()
-    print(f"[V] Vision pronta em {time.time()-t0:.1f}s (frozen, latent={LATENT_DIM})")
+    print(f"[V] Vision ready in {time.time()-t0:.1f}s (frozen, latent={LATENT_DIM})")
     return model
 
 
@@ -79,7 +78,7 @@ def encode_obs(vision, obs, device):
 
 # ---------------------------------------------------------------- M: Memory
 class MemoryRNN(nn.Module):
-    """LSTM que modela p(z_{t+1} | z_t, a_t). Camada de memoria do World Models."""
+    """LSTM modeling p(z_{t+1} | z_t, a_t). Memory component of World Models."""
 
     def __init__(self, latent_dim=LATENT_DIM, hidden_dim=HIDDEN_DIM, n_actions=N_ACTIONS):
         super().__init__()
@@ -96,9 +95,9 @@ class MemoryRNN(nn.Module):
 
 
 def collect_sequential_data(env, num_frames, seed=0):
-    """Coleta frames SEQUENCIAIS com politica aleatoria (necessario p/ treinar LSTM).
-    Recebe um env JA CRIADO e o reutiliza (criar 2+ DeSmuMEs no mesmo processo
-    causa access violation). Nao fecha o env."""
+    """Collects SEQUENTIAL frames under random policy (required for LSTM training).
+    Accepts an ALREADY CREATED env and reuses it (instantiating 2+ DeSmuMEs in the
+    same process causes native access violations). Does not close the env."""
     t0 = time.time()
     rng = np.random.default_rng(seed)
     frames, actions, dones = [], [], []
@@ -117,15 +116,15 @@ def collect_sequential_data(env, num_frames, seed=0):
         if d:
             obs, _ = env.reset()
     elapsed = time.time() - t0
-    print(f"[M] Coleta sequencial: {num_frames} frames em {elapsed:.1f}s "
+    print(f"[M] Sequential data collection: {num_frames} frames in {elapsed:.1f}s "
           f"({num_frames/max(elapsed,1e-6):.1f} fps)")
     return np.array(frames), np.array(actions, dtype=np.int64), np.array(dones, dtype=bool), elapsed
 
 
 def train_memory(memory, frames, actions, dones, vision, device, epochs=8, seq_len=32, batch_size=32, lr=1e-3):
-    """Treina LSTM a prever z_{t+1}. Retorna (loss_final, tempo_s)."""
+    """Trains LSTM to predict z_{t+1}. Returns (final_loss, elapsed_time_s)."""
     t0 = time.time()
-    print("[M] Codificando frames para latentes (GPU, em batch)...")
+    print("[M] Encoding frames to latent space (GPU, batched)...")
     vision.eval()
     zs = []
     with torch.no_grad():
@@ -137,7 +136,7 @@ def train_memory(memory, frames, actions, dones, vision, device, epochs=8, seq_l
     z_all = torch.cat(zs, dim=0)  # (N,512)
     a_all = torch.from_numpy(actions)
 
-    # Monta sequencias que nao cruzam episodio (done)
+    # Assemble sequences that do not cross episode boundaries (done)
     seqs_z, seqs_a = [], []
     i = 0
     N = len(frames)
@@ -149,13 +148,13 @@ def train_memory(memory, frames, actions, dones, vision, device, epochs=8, seq_l
         seqs_a.append(a_all[i:i + seq_len + 1])
         i += seq_len
     if not seqs_z:
-        print("[M] AVISO: poucas sequencias limpas, usando janelas com corte.")
+        print("[M] WARNING: Few clean trajectories found; using window slicing.")
         for i in range(0, N - seq_len - 1, seq_len):
             seqs_z.append(z_all[i:i + seq_len + 1])
             seqs_a.append(a_all[i:i + seq_len + 1])
     seqs_z = torch.stack(seqs_z)  # (S,T+1,512)
     seqs_a = torch.stack(seqs_a)  # (S,T+1)
-    print(f"[M] {len(seqs_z)} sequencias de len={seq_len+1} para treino do LSTM.")
+    print(f"[M] {len(seqs_z)} sequences of len={seq_len+1} generated for LSTM training.")
 
     memory.train().to(device)
     opt = torch.optim.Adam(memory.parameters(), lr=lr)
@@ -180,7 +179,7 @@ def train_memory(memory, frames, actions, dones, vision, device, epochs=8, seq_l
         print(f"[M] epoch {ep+1}/{epochs} loss={final_loss:.6f}")
     memory.eval()
     elapsed = time.time() - t0
-    print(f"[M] Memoria treinada em {elapsed:.1f}s. loss_final={final_loss:.6f}")
+    print(f"[M] Memory trained in {elapsed:.1f}s. final_loss={final_loss:.6f}")
     return final_loss, elapsed
 
 
@@ -197,9 +196,9 @@ def log(msg):
 
 
 def evaluate_individual(vec, env, vision, memory, device, max_steps=1000):
-    """Roda 1 episodio com o controlador linear num env REUTILIZADO.
-    Retorna (fitness, steps_usados). Reutilizar o mesmo env evita
-    recriar o DeSmuME (que causa access violation em criacao/destruicao repetida)."""
+    """Runs 1 episode with linear controller on a REUSED environment.
+    Returns (fitness, steps_used). Reusing the same env avoids recreating
+    DeSmuME instances (which triggers access violations on repeated init/destroy)."""
     W, b = vec_to_params(vec)
     obs, _ = env.reset()
     hx = torch.zeros(1, 1, HIDDEN_DIM, device=device)
@@ -215,7 +214,7 @@ def evaluate_individual(vec, env, vision, memory, device, max_steps=1000):
             action = int(np.argmax(logits))
             obs, reward, done, trunc, _ = env.step(action)
             done = bool(done or trunc)
-            # atualiza memoria: LSTM com seq len 1
+            # Update memory: LSTM with sequence length 1
             zt = torch.from_numpy(z).unsqueeze(0).unsqueeze(0).to(device)
             at = torch.zeros(1, 1, N_ACTIONS, device=device)
             at[0, 0, action] = 1.0
@@ -267,10 +266,10 @@ def evolve(env, vision, memory, device, budget_steps, pop_size=24, max_steps=100
                 pass
         if used >= budget_steps:
             break
-        # selecao + mutacao gaussiana (elitismo)
+        # Selection + Gaussian mutation (elitism)
         order = np.argsort(-np.where(valid, fits, -1e18))
         elites = pop[order[:n_elite]]
-        children = [elites[0].copy()]  # clone do campeao
+        children = [elites[0].copy()]  # Champion clone
         while len(children) < pop_size:
             parent = elites[rng.integers(0, n_elite)]
             children.append(parent + rng.normal(0, sigma, size=d))
@@ -281,18 +280,18 @@ def evolve(env, vision, memory, device, budget_steps, pop_size=24, max_steps=100
 
 # ---------------------------------------------------------------- main
 def main():
-    ap = argparse.ArgumentParser(description="World Models GA: VAE + LSTM + Algoritmo Genetico")
-    ap.add_argument("--rom", type=str, default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).nds")
-    ap.add_argument("--state", type=str, default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).ds1")
-    ap.add_argument("--timesteps", type=int, default=100000, help="Orcamento TOTAL de env steps (M coleta + GA)")
-    ap.add_argument("--mem-frames", type=int, default=10000, help="Steps p/ treino da memoria")
-    ap.add_argument("--mem-epochs", type=int, default=8)
-    ap.add_argument("--pop-size", type=int, default=24)
-    ap.add_argument("--max-ep-steps", type=int, default=1000)
-    ap.add_argument("--sigma", type=float, default=0.05)
-    ap.add_argument("--run-id", type=str, default="worldmodels_ga_100k")
-    ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--test-run", action="store_true")
+    ap = argparse.ArgumentParser(description="World Models GA: VAE + LSTM + Genetic Algorithm")
+    ap.add_argument("--rom", type=str, default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).nds", help="Path to ROM")
+    ap.add_argument("--state", type=str, default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).ds1", help="Path to savestate")
+    ap.add_argument("--timesteps", type=int, default=100000, help="TOTAL budget of env steps (M collection + GA)")
+    ap.add_argument("--mem-frames", type=int, default=10000, help="Steps for memory LSTM training")
+    ap.add_argument("--mem-epochs", type=int, default=8, help="Epochs for memory training")
+    ap.add_argument("--pop-size", type=int, default=24, help="Population size for GA")
+    ap.add_argument("--max-ep-steps", type=int, default=1000, help="Max steps per episode")
+    ap.add_argument("--sigma", type=float, default=0.05, help="Gaussian mutation sigma")
+    ap.add_argument("--run-id", type=str, default="worldmodels_ga_100k", help="Run identifier / model name")
+    ap.add_argument("--seed", type=int, default=0, help="Random seed")
+    ap.add_argument("--test-run", action="store_true", help="Quick sanity run (~3k steps)")
     args = ap.parse_args()
 
     if args.test_run:
@@ -302,12 +301,12 @@ def main():
         args.pop_size = 6
         args.max_ep_steps = 300
 
-    assert args.mem_frames < args.timesteps, "--mem-frames deve ser menor que --timesteps"
+    assert args.mem_frames < args.timesteps, "--mem-frames must be strictly less than --timesteps"
     ga_budget = args.timesteps - args.mem_frames
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device} | Orcamento total: {args.timesteps} steps "
-          f"(memoria={args.mem_frames} + GA={ga_budget})")
+    print(f"Device: {device} | Total budget: {args.timesteps} steps "
+          f"(memory={args.mem_frames} + GA={ga_budget})")
     total_t0 = time.time()
 
     import mlflow
@@ -322,7 +321,7 @@ def main():
         mlflow.log_param("latent_dim", LATENT_DIM)
         mlflow.log_param("hidden_dim", HIDDEN_DIM)
 
-        # UM unico env para o processo inteiro (2+ DeSmuMEs = crash nativo)
+        # Single environment instance for the entire process (2+ DeSmuMEs = native crash)
         ga_env = MarioNdsEnv(rom_path=args.rom, state_path=args.state)
 
         # V
@@ -338,7 +337,7 @@ def main():
         os.makedirs("models", exist_ok=True)
         torch.save(memory.state_dict(), f"models/{args.run_id}_memory.pth")
 
-        # C — reusa o mesmo env
+        # C — reuses same env
         best_vec, best_fit, ga_steps, ga_time, hist = evolve(
             ga_env, vision, memory, device, ga_budget,
             pop_size=args.pop_size, max_steps=args.max_ep_steps,
@@ -353,21 +352,21 @@ def main():
         total_time = time.time() - total_t0
         total_steps = args.mem_frames + ga_steps
         print("\n" + "=" * 60)
-        print(f"TEMPO DE TREINAMENTO (wall-clock):")
-        print(f"  Coleta memoria : {collect_time:.1f}s")
-        print(f"  Treino memoria : {mem_train_time:.1f}s (GPU)")
-        print(f"  Evolucao GA    : {ga_time:.1f}s")
-        print(f"  TOTAL          : {total_time:.1f}s = {total_time/60:.1f} min")
-        print(f"  Env steps usados: {total_steps} (mem={args.mem_frames} + ga={ga_steps})")
-        print(f"  Melhor fitness (treino, 1 ep): {best_fit:.2f}")
+        print("TRAINING WALL-CLOCK TIME:")
+        print(f"  Memory collection: {collect_time:.1f}s")
+        print(f"  Memory training  : {mem_train_time:.1f}s (GPU)")
+        print(f"  GA evolution     : {ga_time:.1f}s")
+        print(f"  TOTAL            : {total_time:.1f}s = {total_time/60:.1f} min")
+        print(f"  Env steps used   : {total_steps} (mem={args.mem_frames} + ga={ga_steps})")
+        print(f"  Best fitness (train, 1 ep): {best_fit:.2f}")
         print("=" * 60)
         mlflow.log_metric("wall_time_total_s", total_time)
         mlflow.log_metric("wall_time_ga_s", ga_time)
         mlflow.log_metric("wall_time_mem_train_s", mem_train_time)
         mlflow.log_metric("env_steps_total", total_steps)
 
-        # Avaliacao final: 10 episodios (mesmo protocolo do README), reusa ga_env
-        print("\nAvaliacao final (10 episodios)...", flush=True)
+        # Final evaluation: 10 episodes (standard benchmark protocol), reuses ga_env
+        print("\nFinal evaluation (10 episodes)...", flush=True)
         scores = []
         for ep in range(10):
             f, s = evaluate_individual(best_vec, ga_env, vision,
@@ -376,7 +375,7 @@ def main():
             print(f"  ep {ep+1}: reward={f:.2f} steps={s}", flush=True)
         ga_env.close()
         scores = np.array(scores)
-        print(f"RESULTADO 10eps: media={scores.mean():.2f} std={scores.std():.2f} max={scores.max():.2f}")
+        print(f"10-EPISODE RESULTS: mean={scores.mean():.2f} std={scores.std():.2f} max={scores.max():.2f}")
         mlflow.log_metric("eval_mean_10ep", float(scores.mean()))
         mlflow.log_metric("eval_std_10ep", float(scores.std()))
         mlflow.log_metric("eval_max_10ep", float(scores.max()))

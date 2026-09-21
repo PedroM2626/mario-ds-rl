@@ -23,8 +23,8 @@ class MarioNdsEnv(gym.Env):
     """
     metadata = {'render_modes': ['human', 'rgb_array']}
 
-    # Fator de escala camera-RAM -> pixels (20.12 fixed point; ver src/ram_state.py).
-    # Calibrado contra o optical flow (correlacao ~1.0 nos deltas).
+    # Scale factor camera-RAM -> pixels (20.12 fixed point; see src/ram_state.py).
+    # Calibrated against optical flow (~1.0 correlation in deltas).
     RAM_PX_PER_UNIT = 1.0 / 4096.0
 
     def __init__(self, rom_path, state_path, render_mode=None, reward_mode="flow"):
@@ -33,9 +33,9 @@ class MarioNdsEnv(gym.Env):
         self.rom_path = rom_path
         self.state_path = state_path
         self.render_mode = render_mode
-        # "flow": recompensa por visao (legado); "ram": progresso pela camera-RAM
-        # + morte pelas vidas (src/ram_state.py). Deteccao por templates continua
-        # ativa nos dois modos como redundancia.
+        # "flow": visual reward via optical flow (legacy); "ram": progress via camera-RAM
+        # + death via lives (src/ram_state.py). Template matching detection remains
+        # active in both modes as redundancy.
         self.reward_mode = reward_mode
         self.ram = None
         
@@ -93,7 +93,7 @@ class MarioNdsEnv(gym.Env):
         self.accumulated_camera_x = 0.0
         self.last_mario_screen_x = 10.0
         self.current_x = 0
-        self.frameskip = 8 # Aumentado de 6 para 8 conforme requisitado
+        self.frameskip = 8 # Increased from 6 to 8 as required
 
     def _get_obs(self):
         if not self.has_emulator:
@@ -221,8 +221,8 @@ class MarioNdsEnv(gym.Env):
             self._ram_died = st["died"]
         else:
             # We use the displacement calculated in _get_obs
-            # Reduzimos a penalidade de tempo para evitar o suicídio intencional, 
-            # mas ainda forçamos ele a não ficar parado para sempre.
+            # We reduce the time penalty to prevent intentional suicide,
+            # but still force the agent not to stay still forever.
             time_penalty = -0.05
             reward = self.last_reward_displacement + time_penalty
             self.current_x = self.accumulated_x # Track approximate distance for info
@@ -245,7 +245,7 @@ class MarioNdsEnv(gym.Env):
                 reward -= 15.0  
                 print("Death detected!")
 
-        # Morte pelas vidas-RAM (redundante com o template; nao depende de visao)
+        # Death detected via RAM lives (redundant with template; independent of vision)
         if getattr(self, "_ram_died", False) and not done:
             done = True
             reward -= 15.0

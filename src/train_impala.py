@@ -121,7 +121,7 @@ def main():
                 reset_num_timesteps=reset_ts
             )
         except KeyboardInterrupt:
-            print("\nTreinamento interrompido pelo usuário! Salvando progresso...")
+            print("\nTraining interrupted by user! Saving progress...")
 
         os.makedirs("models", exist_ok=True)
         model_path = f"models/{args.run_id}"

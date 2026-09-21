@@ -1,14 +1,14 @@
-"""Env 100% RAM (sem pixels, sem CNN): estado = vetor de 17 floats.
+"""100% RAM Environment (zero pixels, no CNN): state = vector of 17 floats.
 
-Observacao (Box 17, normalizada p/ MLP):
+Observation (Box 17, normalized for MLP):
   [x, y, vx, vy, on_ground, lives, time, cam_x,
    edx0, edy0, etype0, edx1, edy1, etype1, edx2, edy2, etype2]
-  x,y relativos ao reset (px, /512); vx,vy em px/frame (/4);
-  inimigos: 3 mais proximos em |dx|, dx/dy em px (/256), tipo/256.
-Recompensa: mesma formula do env visual (progresso*2 - 0.05, morte -15).
-Done: morte (vidas) ou timer zerado (-50, como timeout) ou 1000 steps.
-Sem pixels: finish (+100) nao detectado nesta v1 (nenhum agente chega la em
-testes curtos); timeout usa o timer-RAM.
+  x,y relative to episode reset (px, /512); vx,vy in px/frame (/4);
+  enemies: 3 closest in |dx|, dx/dy in px (/256), type/256.
+Reward: identical formula to visual env (progress*2 - 0.05, death -15).
+Done: death (lives drop), timer reaches zero (-50, equivalent to timeout), or 1000 steps cap.
+Without pixels: level finish (+100) is not detected in this v1 (no policy reached stage end in
+short evaluations); timeout is monitored via RAM stage timer.
 """
 import os
 import numpy as np
@@ -29,7 +29,7 @@ TIME_ADDR = 0x020DC968
 YVEL_ADDR = 0x021C1908
 N_ENEMIES = 3
 OBS_DIM = 8 + 3 * N_ENEMIES
-GEO_DIM = 6  # flags de pit nas 6 colunas a frente
+GEO_DIM = 6  # Pit flags for the 6 columns ahead
 MAX_STEPS = 1000
 
 
@@ -52,7 +52,7 @@ class MarioRamEnv(gym.Env):
                 from course import Course
                 self.course = Course(rom_path=rom_path)
             except Exception as e:
-                print(f"Geo desativado (falha ao ler course: {e})")
+                print(f"Geometry disabled (failed to load course: {e})")
                 self.geo = False
         try:
             self.emu = DeSmuME()
@@ -112,7 +112,7 @@ class MarioRamEnv(gym.Env):
         self._x0 = self._y0 = None
         self.episode_steps = 0
         obs, _ = self._observe()
-        # fixa origem apos primeira leitura
+        # Origin fixed after first poll
         return obs, {}
 
     def step(self, action):

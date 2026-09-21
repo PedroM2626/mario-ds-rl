@@ -45,7 +45,7 @@ def main():
             "--use-spr",
             "--run-id", "ppo_spr_100k"
         ],
-        # 3. PPO Causal Transformer + SPR (Substituição da LSTM por Transformer + SPR)
+        # 3. PPO Causal Transformer + SPR (Replacing LSTM with Transformer + SPR)
         [
             sys.executable, "src/train_ppo_recurrent.py",
             "--timesteps", "100000",

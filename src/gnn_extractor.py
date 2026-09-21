@@ -1,10 +1,10 @@
-"""GNN pura-torch (sem PyG/DGL) como extrator SB3.
+"""Pure PyTorch GNN (without PyG/DGL) as a Stable-Baselines3 feature extractor.
 
-No (14 = 1 Mario + 5 inimigos + 8 retangulos estaticos) x F=8:
+Nodes (14 = 1 Mario + 5 enemies + 8 static rectangles) x F=8:
   [dx, dy, w, h, is_mario, is_enemy, is_static, type_norm]
-Message passing (2x, grafo completo, media mascarada) + pool global.
-Invariante a permutacao dos nos por construcao (o MLP ordenado por
-distancia nao e: trocas de slot geram descontinuidades).
+Message passing (2x, fully connected graph, masked mean) + global pooling.
+Permutation invariant across nodes by design (unlike distance-sorted MLPs,
+where slot swaps cause discontinuities).
 """
 import torch
 import torch.nn as nn
@@ -34,7 +34,7 @@ class MeanMPNN(nn.Module):
             m = m.expand_as(h)
             h = torch.relu(layer(torch.cat([h, m], dim=-1)))
         g = (h * mask.unsqueeze(-1)).sum(dim=1) / denom.squeeze(-1)
-        return self.out(torch.cat([g, h[:, 0]], dim=-1))  # pool + no Mario
+        return self.out(torch.cat([g, h[:, 0]], dim=-1))  # pool + Mario node
 
 
 class GNNExtractor(BaseFeaturesExtractor):
@@ -42,7 +42,7 @@ class GNNExtractor(BaseFeaturesExtractor):
         super().__init__(observation_space, features_dim)
         assert observation_space.shape == (OBS_DIM,), observation_space.shape
         self.gnn = MeanMPNN()
-        # projecao do vetor global p/ somar (skip connection simples via concat)
+        # Global vector projection for skip connection via concatenation
         self.head = nn.Sequential(nn.Linear(256 + GLOBAL_DIM, 256), nn.ReLU())
 
     def forward(self, observations):

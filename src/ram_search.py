@@ -1,8 +1,8 @@
-"""Busca diferencial de enderecos RAM na ROM EUR (onde os mapas US nao valem).
+"""Differential RAM search on EUR ROM (where US memory maps are invalid).
 
-Fase 1: segura DIREITA, coleta N dumps; acha u32/s32/u16 monotonicamente
-        crescentes (candidato a X do Mario / camera / contadores).
-Uso:
+Phase 1: hold RIGHT, collect N memory dumps; locate monotonically increasing
+         u32/s32/u16 values (candidates for Mario X / camera / event counters).
+Usage:
   python src/ram_search.py --dumps 6 --steps 400 --out ram_search.npz
 """
 import argparse
@@ -38,9 +38,9 @@ def hold(emu, keys, steps, frameskip=8):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dumps", type=int, default=6)
-    ap.add_argument("--steps", type=int, default=400)
-    ap.add_argument("--out", type=str, default="ram_search.npz")
+    ap.add_argument("--dumps", type=int, default=6, help="Number of sequential memory dumps")
+    ap.add_argument("--steps", type=int, default=400, help="Steps between dumps")
+    ap.add_argument("--out", type=str, default="ram_search.npz", help="Output file path")
     args = ap.parse_args()
 
     emu = DeSmuME()
@@ -51,11 +51,11 @@ def main():
     for i in range(args.dumps - 1):
         hold(emu, [Keys.KEY_RIGHT], args.steps)
         dumps.append(dump_ram(emu))
-        print(f"dump {i+2}/{args.dumps} ok", flush=True)
+        print(f"dump {i+2}/{args.dumps} complete", flush=True)
     emu.destroy()
 
     D = np.stack(dumps)  # (N, 4MB) uint8
-    print("procurando u32 monotonicos...", flush=True)
+    print("Searching for monotonic u32/s32 values...", flush=True)
     U = np.stack([np.frombuffer(d.tobytes(), dtype="<u4") for d in dumps])
     S = U.view(np.int32)
     mono_u = np.ones(U.shape[1], bool)
@@ -65,7 +65,7 @@ def main():
         mono_s &= S[k] > S[k - 1]
     both = mono_u | mono_s
     idx = np.nonzero(both)[0]
-    print(f"candidatos u32/s32 monotonicos: {len(idx)}", flush=True)
+    print(f"Monotonic u32/s32 candidates found: {len(idx)}", flush=True)
     for i in idx[:50]:
         vals = U[:, i].tolist()
         print(f"  0x{RAM_BASE + int(i)*4:08X} u32={vals} signed={S[:, i].tolist()}", flush=True)
@@ -75,7 +75,7 @@ def main():
     for k in range(1, len(dumps)):
         mono_h &= H[k] > H[k - 1]
     hidx = np.nonzero(mono_h)[0]
-    print(f"candidatos u16 monotonicos: {len(hidx)} (top 20 por delta)", flush=True)
+    print(f"Monotonic u16 candidates found: {len(hidx)} (top 20 by delta)", flush=True)
     deltas = (H[-1, hidx].astype(int) - H[0, hidx].astype(int))
     order = np.argsort(-deltas)[:20]
     for j in order:
@@ -83,7 +83,7 @@ def main():
         print(f"  0x{RAM_BASE + int(i)*2:08X} u16={H[:, i].tolist()}", flush=True)
 
     np.savez_compressed(args.out, dumps=D, u32_idx=idx, u16_idx=hidx)
-    print(f"salvo em {args.out}", flush=True)
+    print(f"Results saved to {args.out}", flush=True)
 
 
 if __name__ == "__main__":

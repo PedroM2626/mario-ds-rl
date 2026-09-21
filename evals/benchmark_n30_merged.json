@@ -2,7 +2,7 @@
  "protocol": {
   "det": 10,
   "stoch": 30,
-  "note": "n=30 fresco por modelo, seeds 100/200/300 por bloco; 203105 parcial (impala separado); 220123 parcial (gnn separado)"
+  "note": "fresh n=30 per model, seeds 100/200/300 per block; 203105 partial (impala separate); 220123 partial (gnn separate)"
  },
  "results": {
   "drq": {

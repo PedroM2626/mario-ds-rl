@@ -159,7 +159,7 @@ class SPRCallback(BaseCallback):
             
         losses = []
         
-        # Otimização por épocas
+        # Optimization across epochs
         for epoch in range(self.epochs):
             # Sample random starts along the sequence and environment indices
             t_indices = torch.randint(0, n_steps - K, (self.batch_size,))

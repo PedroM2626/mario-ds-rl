@@ -1,8 +1,8 @@
-"""Env de GRAFO (Box(134) flat): no Mario + <=5 inimigos + <=8 retangulos
-estaticos proximos (da ROM via course.py) + vetor global + mascara.
+"""Graph Environment (flat Box(134)): Mario node + <=5 enemies + <=8 static
+nearby rectangles (from ROM via course.py) + global vector + mask.
 
-Recompensa/done/acoes identicos ao MarioRamEnv (heranca); so a observacao
-muda (relacional em vez de vetor ordenado).
+Reward/done/action spaces are identical to MarioRamEnv (inheritance); only the observation
+is transformed (relational entity graph instead of distance-sorted vector).
 """
 import os
 import sys
@@ -33,7 +33,7 @@ class MarioGraphEnv(MarioRamEnv):
                 from course import Course
                 self.course = Course(rom_path=self.rom_path)
             except Exception as e:
-                print(f"Sem course (nos estaticos zerados): {e}")
+                print(f"No course loaded (static nodes zeroed): {e}")
 
     def _observe(self):
         st = self.ram.poll()
@@ -50,10 +50,10 @@ class MarioGraphEnv(MarioRamEnv):
                 self._s32read(0x020DC968) / 4096.0 / 400.0,
                 st["acc_cam"] / 4096.0 / 512.0]
         nodes, mask = [], []
-        # no 0: Mario (dx=dy=0 por definicao)
+        # Node 0: Mario (dx=dy=0 by definition)
         nodes.append([0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0])
         mask.append(1.0)
-        # inimigos (ate 5, quaisquer — ordem irrelevante p/ GNN)
+        # Enemies (up to 5, any order - order is irrelevant for GNN)
         try:
             ens = self.ram.enemies()[:50]
         except Exception:
@@ -65,7 +65,7 @@ class MarioGraphEnv(MarioRamEnv):
         while len([m for m in mask]) < 1 + N_EN:
             nodes.append([0.0] * NODE_F)
             mask.append(0.0)
-        # retangulos estaticos proximos (ate 8 por |dx|)
+        # Static nearby rectangles (up to 8 sorted by |dx|)
         stat = []
         if self.course is not None and mb is not None:
             mario_px = mb / 4096.0

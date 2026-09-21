@@ -1,28 +1,28 @@
-"""Leitura direta de variaveis do jogo via RAM (ROM EUR NTR-A2DP-EUR).
+"""Direct game variable extraction via RAM memory reading (EUR ROM NTR-A2DP-EUR).
 
-Descobertas validadas por busca diferencial + screenshots + pokes (ver README §10):
-  LIVES_ADDR  0x0209DC00 u8   : vidas (5->4 na morte; cf. AR code EUR 2209DC00)
-  CAM_ADDRS   0x02098240 / 0x020DCFA0 u32 : camera X (deadzone, congela no mapa)
-  ODO_ADDR    0x0209AE9C u32  : contador de atividade horizontal
-  MARIO_BASE  0x021C1890      : objeto do Mario (tipo 0x1C em +0x44; estavel
-                                p/ este savestate em todos os boots testados)
-  Campos do objeto (offsets validados; Y=A, X=B em 20.12 fixo):
-    +0x44 u16 tipo (0x1C Mario, 0xA0 Goomba, ... tabela OBJ_TYPES)
-    +0x60 s32 A (vertical; Mario faz arco de pulo, baseline -480px)
-    +0x68 s32 B (horizontal; goomba marcha p/ esquerda)
-  Lista ligada circular de objetos: node = obj+0x38 [prev, next];
-  inimigos entram na lista ao se aproximarem (goomba linka ~20 steps).
+Discoveries validated via differential search + screenshots + memory pokes (see README §10):
+  LIVES_ADDR  0x0209DC00 u8   : lives (5->4 on death; cf. AR code EUR 2209DC00)
+  CAM_ADDRS   0x02098240 / 0x020DCFA0 u32 : camera X (deadzone, freezes on map)
+  ODO_ADDR    0x0209AE9C u32  : horizontal activity counter
+  MARIO_BASE  0x021C1890      : Mario object (type 0x1C at +0x44; stable
+                                for this savestate across all tested boots)
+  Object fields (validated offsets; Y=A, X=B in 20.12 fixed point):
+    +0x44 u16 type (0x1C Mario, 0xA0 Goomba, ... table OBJ_TYPES)
+    +0x60 s32 A (vertical; Mario jump arc, floor baseline -480px)
+    +0x68 s32 B (horizontal; goomba marches left)
+  Circular linked list of entities: node = obj+0x38 [prev, next];
+  enemies link into list upon screen proximity (goomba links at ~20 steps).
 
-NAO resolvido: X absoluto em pixels de tela (duas bases coerentes: 0x021C1828
-spawna em 48.0px; B do objeto difere por +40px — deltas sao identicos, o que
-basta p/ reward); Y em pixels idem. Inimigos: posicao RELATIVA (dx,dy) ao Mario.
+Unresolved: absolute screen pixel X (two consistent bases: 0x021C1828 spawns
+at 48.0px; object B differs by +40px — deltas are identical, which suffices
+for reward); pixel Y is analogous. Enemies: RELATIVE position (dx, dy) to Mario.
 """
 import numpy as np
 
 LIVES_ADDR = 0x0209DC00
 CAM_ADDRS = (0x02098240, 0x020DCFA0)
 ODO_ADDR = 0x0209AE9C
-Y_ADDR = 0x020A703C  # experimental (plano no chao, sobe em queda)
+Y_ADDR = 0x020A703C  # Experimental (flat on ground, increases in freefall)
 VEL_ADDRS = (0x021C1904, 0x021C1928, 0x021C1940, 0x021C1A94, 0x021C1F6C)
 MARIO_BASE = 0x021C1890
 OFF_TYPE, OFF_A, OFF_B, OFF_NODE = 0x44, 0x60, 0x68, 0x38
@@ -42,12 +42,12 @@ def _s32(v):
 
 
 def _du32(cur, prev):
-    """Delta com correcao de wrap-around."""
+    """Delta calculation with wrap-around handling."""
     return (cur - prev + 2 ** 31) % _U32_MOD - 2 ** 31
 
 
 class RamState:
-    """Leitor de estado via RAM. Custo por poll: ~10 leituras + walk (~50)."""
+    """RAM state reader. Cost per poll: ~10 memory reads + linked list walk (~50)."""
 
     def __init__(self, emu):
         self.emu = emu
@@ -58,7 +58,7 @@ class RamState:
         self.deaths = 0
         self.mario_base = None
 
-    # -- primitivas -----------------------------------------------------
+    # -- memory access primitives ---------------------------------------
     def _r32(self, addr):
         return self.emu.memory.read(addr, addr, 4, False)
 
@@ -68,7 +68,7 @@ class RamState:
     def _r16(self, addr):
         return self.emu.memory.read(addr, addr, 2, False)
 
-    # -- descoberta do Mario --------------------------------------------
+    # -- Mario base discovery -------------------------------------------
     def _walk(self, start_node, maxn=40):
         seen, out, node = set(), [], start_node
         for _ in range(maxn):
@@ -82,7 +82,7 @@ class RamState:
         return out
 
     def discover_mario(self):
-        """Acha a base do Mario: base conhecida (1 read) ou scan + walk."""
+        """Locates Mario's base address: known base (1 read) or scan + walk."""
         try:
             if self._r16(MARIO_BASE + OFF_TYPE) == 0x1C:
                 self.mario_base = MARIO_BASE
@@ -115,9 +115,9 @@ class RamState:
             return None, None
 
     def enemies(self, max_dx_px=600, max_dy_px=400):
-        """Walk a partir do Mario: [{type, B, A, dx, dy}] (unidades 20.12).
-        Filtra por relevancia na tela (dx/dy em px). Goomba validado:
-        dx 164px -> contato (~10px) -> morte via lives."""
+        """Linked list walk starting from Mario: [{type, B, A, dx, dy}] (20.12 units).
+        Filters entities by screen relevance (dx/dy in px). Validated Goomba:
+        dx 164px -> contact (~10px) -> death via lives decrement."""
         if self.mario_base is None and self.discover_mario() is None:
             return []
         ma, mb = self._mario_pos()
@@ -143,9 +143,9 @@ class RamState:
             out.append(e)
         return out
 
-    # -- poll principal ---------------------------------------------------
+    # -- main poll --------------------------------------------------------
     def poll(self):
-        """Retorna dict com estado atual + deltas. Deve ser chamado 1x por step."""
+        """Returns dict with current state + deltas. Called once per environment step."""
         mem = self.emu.memory
         lives = mem.read(LIVES_ADDR, LIVES_ADDR, 1, False)
         cam = mem.read(CAM_ADDRS[1], CAM_ADDRS[1], 4, False)
@@ -156,7 +156,7 @@ class RamState:
         if self.prev_cam is None:
             self.prev_cam, self.prev_lives = cam, lives
         cam_dx = _du32(cam, self.prev_cam)
-        # ignora saltos absurdos (troca de area/mapa): deadzone de sanidade
+        # Ignore anomalous jumps (area/map transitions): sanity deadzone
         if abs(cam_dx) > 1_000_000:
             cam_dx = 0
         self.acc_cam += cam_dx
@@ -180,4 +180,4 @@ class RamState:
         self.acc_cam = 0.0
         self.max_acc = 0.0
         self.prev_lives = None
-        # mario_base persiste (savestate => mesmo layout); redescobre se falhar
+        # mario_base persists (same savestate => identical memory layout); rediscover on failure

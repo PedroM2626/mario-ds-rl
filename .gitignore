@@ -1,16 +1,20 @@
 data/
 *.pyc
-*pycache*
-*ml*
+*pycache*/
+__pycache__/
+mlruns/
+mlruns.db
+mlflow.db
+tensorboard_logs/
 *tensorboard*
 
-# Checkpoints intermediarios (pesados e redundantes; o modelo final vai em models/)
+# Intermediate checkpoints (heavy and redundant; final models are placed in models/)
 models/checkpoints/
 
-# Artefatos de sanity/debug locais
+# Local sanity/debug artifacts
 models/*sanity*
 
-# Logs e listagens geradas (regeneraveis; resultados oficiais vao em evals/*.json)
+# Generated logs and run listings (reproducible; official results are stored in evals/*.json)
 *.log
 ram_search.npz
 eval_results.txt

@@ -12,8 +12,8 @@ from env import MarioNdsEnv
 class MLflowCallback(BaseCallback):
     """
     Custom callback for logging to MLflow.
-    NOTA: metricas intrinsecas existem em TODO step (ICM) — logar cada uma
-    derruba o treino (~7x mais lento por commits SQLite). Amostradas a cada 50.
+    NOTE: Intrinsic metrics exist at EVERY step (ICM) — logging each one
+    drastically slows training (~7x slower due to SQLite commits). Sampled every 50 steps.
     """
     def __init__(self, verbose=0):
         super().__init__(verbose)
@@ -179,7 +179,7 @@ def main():
             reset_ts = False if args.resume else True
             model.learn(total_timesteps=timesteps, callback=[MLflowCallback(), checkpoint_callback], reset_num_timesteps=reset_ts)
         except KeyboardInterrupt:
-            print("\nTreinamento interrompido pelo usuário! Salvando o progresso atual...")
+            print("\nTraining interrupted by user! Saving current progress...")
 
         # Save Model locally (this runs whether it finishes naturally or is interrupted)
         os.makedirs("models", exist_ok=True)
