@@ -4,6 +4,13 @@ This repository implements an academic and experimental Reinforcement Learning (
 
 The codebase is engineered with MLOps best practices and supports diverse learning paradigms: model-free policy gradients (PPO, RecurrentPPO, ImpalaCNN), self-supervised auxiliary visual representations (Autoencoders, CURL, SPR, DrQ-v2), intrinsic curiosity (ICM), causal sequence modeling (Causal Transformers), evolutionary and model-based World Models (DreamerV3, NE-Dreamer, GA, sep-CMA-ES), and relational Graph Neural Networks (MeanMPNN).
 
+## Contents
+- [Prerequisites and Installation](#-prerequisites-and-installation)
+- [Visual Reward Methodology](#-visual-reward-methodology)
+- [Training Architectures & Paradigms](#-training-architectures--paradigms) (1–14, incl. [§14 Physics-Informed PINN World Model](#14-physics-informed-pinn-world-model--fast-training--real-time-play))
+- [Experiment Management (MLOps)](#-experiment-management-mlops)
+- [Acknowledgments](#-acknowledgments)
+
 ---
 
 ## 🛠 Prerequisites and Installation
@@ -17,9 +24,29 @@ pip install gymnasium stable-baselines3[extra] sb3-contrib opencv-python py-desm
 > **Notice:** The `py-desmume` package provides Python bindings for the DeSmuME Nintendo DS emulation core. Without it, the environment falls back to static dummy stubs for non-emulated unit testing.
 
 ### Directory Structure
-Place the target ROM binary and initial episode savestate in the `data/` directory:
+
+```
+mario-ds/
+├── data/         # NSMB (EUR) ROM, savestate (.ds1), collected dataset (.npz), test trajectories
+├── src/          # all environments, models, training + evaluation scripts (flat, import each other)
+│   ├── env.py / course.py / ram_env.py / ram_state.py   # DeSmuME env, ROM tile parser, RAM env/state
+│   ├── train*.py / evaluate*.py                          # per-paradigm trainers + benchmark eval
+│   └── pinn_world_model.py / tilemap_planner.py          # physics-informed world model + A*/surface planner
+├── nedreamer/    # NE-Dreamer (vendored in-tree, not a submodule) — see Acknowledgments
+├── models/       # saved policies/checkpoints (.zip SB3, .pt torch, .npz world models)
+├── evals/        # benchmark result JSONs + PINN real-time eval output
+├── media/        # recorded gameplay clips (.avi) + evidence frames (.png)
+├── docs/         # deep-dive methodology (e.g. WORLD_MODEL_PINN.md)
+└── tensorboard_logs/ mlruns/ mlflow.db   # experiment tracking
+```
+
+Place the target ROM binary and initial episode savestate in `data/`:
 - `data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).nds` (or symlink `data/mario.nds`)
 - `data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).ds1` (or `data/state.dst`)
+
+> **NE-Dreamer** lives in-tree at `nedreamer/` (a first-class package, not a git submodule). Run its
+> Mario config via `python src/train_nedreamer_mlflow.py` or from `nedreamer/train.py` with
+> `--config configs/env/marionds.yaml`. Credit to the upstream project — see [Acknowledgments](#-acknowledgments).
 
 ---
 
