@@ -1,0 +1,19 @@
+task: 'marionds_v0'
+steps: 1.01e5
+env_num: 1
+eval_episode_num: 5
+action_repeat: 4
+train_ratio: 512
+time_limit: 108000
+
+seed: ${seed}
+device: ${device}
+vectorized: False
+
+size: [84, 84]
+encoder:
+  mlp_keys: '$^'
+  cnn_keys: 'image'
+decoder:
+  mlp_keys: '$^'
+  cnn_keys: 'image'

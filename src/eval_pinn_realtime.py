@@ -95,7 +95,8 @@ class ReflexiveMPCAgent:
     """
 
     name = "mpc+reflex"
-    JUMP = 4   # right + dash + jump  (running leap)
+    JUMP = 4   # right + dash + jump  (running leap: clears pits, pipes, tall walls)
+    HOP = 2    # right + jump         (short walk-hop: climbs 1-tile staircase steps)
     RUN = 3    # right + dash         (maintain running speed)
     LEFT = 5   # used briefly to gain runway when deeply stuck
     STUCK_ACTIONS = (4, 2, 6, 5)  # escape repertoire: run-jump, walk-jump, dash+jump, jump
@@ -114,17 +115,26 @@ class ReflexiveMPCAgent:
         self._stuck = 0
         self._escape = 0
         self._retreat = 0
+        self._blocked = 0
+        self._queue = []        # scripted unstick maneuver (retreat -> charge -> leap)
 
-    def _pit_threat(self, obs):
-        """Pit takeoff decision: global A* plan if available, else local ROM flags."""
+    def _surface_threat(self, obs):
+        """Geometry decision. Pits use the authoritative RAM ground flags (proven);
+        tall pipes/walls (a >=3-tile rise in the ROM surface profile) get a preemptive
+        running leap. Smaller steps are left to the blocked-jump: leaping them early
+        throws Mario into nearby Goombas (empirically worse)."""
+        if self.pit_lookahead > 0 and any(obs[17 + c] < 0.5 for c in range(self.pit_lookahead)):
+            return "leap"                                  # pit ahead -> running leap
         if self.planner is not None:
             abs_px = SPAWN_ABS_PX + obs[0] * 512.0
-            jump, _width = self.planner.should_jump(abs_px)
-            if jump:
-                return "pit"
-            return None
-        if self.pit_lookahead > 0 and any(obs[17 + c] < 0.5 for c in range(self.pit_lookahead)):
-            return "pit"
+            cur, prof = self.planner.surface_ahead(abs_px, look_tiles=3)
+            if cur is None:
+                return None
+            for _c, row in prof:
+                if row is None:
+                    continue                               # pits handled by flags above
+                if cur - row >= 3:                         # pipe / tall wall -> leap
+                    return "leap"
         return None
 
     def _threat(self, obs):
@@ -137,9 +147,7 @@ class ReflexiveMPCAgent:
                 return "enemy"
             if et > 1.0 and abs(dy) < self.enemy_dy and 0 < dx:
                 ene = min(ene, dx)
-        if ene <= self.pit_enemy_suppress:
-            return None                          # a hazard sits in the landing zone
-        return self._pit_threat(obs)
+        return None
 
     def act(self, obs):
         on_ground = obs[4] > 0.5
@@ -150,26 +158,32 @@ class ReflexiveMPCAgent:
         else:
             self._stuck = 0
         self._last_x = obs[0]
-        if self._retreat > 0:                 # back off to build a running-jump runway
-            self._retreat -= 1
-            return self.LEFT
+        if self._queue:                         # play out a scripted unstick maneuver
+            return self._queue.pop(0)
         if self.enabled and self.clearing:
             if not on_ground:
                 return self.RUN
             self.clearing = False
         blocked = self._stuck >= 3
-        threat = self._threat(obs) if self.enabled else None
-        if self.enabled and on_ground and vy > -0.05 and (blocked or threat is not None):
-            self.clearing = True
-            if blocked:                       # escalate an escape repertoire, then retreat
-                self._escape = (self._escape + 1) % len(self.STUCK_ACTIONS)
-                if self._stuck >= 9:
-                    self._stuck = 0
-                    self._retreat = 3
-                return self.STUCK_ACTIONS[self._escape]
-            self._stuck = 0
-            self._escape = 0
-            return self.JUMP
+        enemy = self._threat(obs) if self.enabled else None
+        surf = self._surface_threat(obs) if self.enabled else None
+        if self.enabled and on_ground and vy > -0.05:
+            if blocked:
+                self._stuck = 0
+                self._blocked += 1
+                if self._blocked >= 3:
+                    # arrived already stopped against a wall: a standstill leap goes
+                    # straight up (no forward momentum). Back off, then charge a real
+                    # running leap over it.
+                    self._blocked = 0
+                    self._queue = [self.LEFT] * 4 + [self.RUN] * 8 + [self.JUMP]
+                else:
+                    return self.JUMP
+            elif enemy is not None or surf is not None:
+                self.clearing = True
+                return self.HOP if surf == "hop" else self.JUMP
+            else:
+                self._blocked = 0
         return self.mpc.act(obs)
 
     def reset(self):
@@ -178,6 +192,8 @@ class ReflexiveMPCAgent:
         self._stuck = 0
         self._escape = 0
         self._retreat = 0
+        self._blocked = 0
+        self._queue = []
         self.mpc.reset()
 
 
@@ -211,6 +227,8 @@ class ReactiveAgent(ReflexiveMPCAgent):
         self._stuck = 0
         self._escape = 0
         self._retreat = 0
+        self._blocked = 0
+        self._queue = []
 
 
 class PPOAgent:
@@ -325,15 +343,14 @@ def main():
                     help="pessimism on unpredictable enemy motion (probabilistic head)")
     ap.add_argument("--pit-enemy-suppress", type=float, default=0.0,
                     help="skip pit-jump if an enemy is within this many px (0=always jump)")
-    ap.add_argument("--no-planner", action="store_true", help="disable the tilemap A* planner")
     args = ap.parse_args()
 
     render = args.render and not args.headless
     device = args.device
     goal = args.goal_px or goal_px()
-    planner = None if args.no_planner else TilemapAStar(rom_path=args.rom)
+    planner = TilemapAStar(rom_path=args.rom)   # ROM geometry -> wall/pipe perception
     print(f"[pinn-eval] controller={args.controller} device={device} goal_abs_px={goal} "
-          f"A*planner={'on' if planner is not None else 'off'}")
+          f"wall_planner=on")
 
     if args.controller == "mpc":
         ck = torch.load(args.model, map_location=device, weights_only=False)
@@ -355,7 +372,8 @@ def main():
     else:
         make_agent = lambda: PPOAgent(args.policy, device)
 
-    env = MarioRamEnv(rom_path=args.rom, state_path=args.state, geo=True, max_steps=args.max_steps)
+    env = MarioRamEnv(rom_path=args.rom, state_path=args.state, geo=True,
+                      max_steps=args.max_steps)
     writer = None
     if args.record:
         import cv2

@@ -277,7 +277,7 @@ python src/eval_pinn_realtime.py --controller reactive --render                 
 python src/tilemap_planner.py                                                             # A* feasibility proof (stage is completable)
 ```
 
-**Real-time console results** (World 1-1, goal ≈ 4256 px, 8 episodes): the dash unlock **doubles** reach to a reliable **~43% (1819 px)** (reflex + A\*, real-time); CEM-MPC over the PINN and the imagination PPO (2.5 ms/frame, >400 FPS) both also run live. The **tilemap A\*** proves the stage is **geometrically feasible** (14 pits, max 5 tiles, all within a running jump). The agent clears the pits and Goombas but does **not yet fully finish**: a ceiling/falling hazard (RAM type `0x4C`) near x≈1792 is **absent from the egocentric observation** until too late to react (a dynamic-perception frontier the smw-pinn study leaves open; no agent in this repo's prior benchmarks cleared 1-1 either). Full methodology + honest limits: **[`docs/WORLD_MODEL_PINN.md`](docs/WORLD_MODEL_PINN.md)**. Clip: `media/pinn_mpc_run.avi`.
+**Real-time console results** (World 1-1, goal ≈ 4256 px): the dash unlock **doubles** reach; with ROM **wall/pipe perception** the reflex + A\* now **clears the first ~4-tile green pipe** and reaches **~44% (1889 px)** — the furthest any controller here gets on 1-1. CEM-MPC over the PINN and the imagination PPO (2.5 ms/frame, >400 FPS) also run live. The **tilemap A\*** proves the stage is **geometrically feasible** (14 pits, max 5 tiles, all within a running jump). The agent clears the pits, Goombas and the first pipe but does **not yet fully finish**: direct in-game evidence (rendered frame + velocity trace) localises the barrier to the **pipe + dense block-staircase** just after it — a standstill jump on a narrow surface goes straight up (`vx=0`) so Mario oscillates until the **stage timer** expires. This is a genuine **multi-hop 2D-platforming / runway-timing** problem (not a perception gap, not the world model); clearing the rest needs a full solid-tile 2D platformer planner or large-scale direct RL. Full methodology + honest limits: **[`docs/WORLD_MODEL_PINN.md`](docs/WORLD_MODEL_PINN.md)**. Clips: `media/pinn_mpc_run.avi`, barrier frame `media/nsmb_pipe_top_timesup.png`.
 
 ---
 
@@ -307,3 +307,17 @@ All metrics (extrinsic reward, intrinsic curiosity, rollout lengths, loss curves
 mlflow ui
 ```
 Navigate to `http://localhost:5000` to inspect comparative metric runs and parameter sweeps.
+
+---
+
+## 🙏 Acknowledgments
+
+* **NE-Dreamer** — the `nedreamer/` package vendored in this repository is based on
+  [**corl-team/nedreamer**](https://github.com/corl-team/nedreamer) (Bredis, Balagansky,
+  Gavrilov, Rakhimov), which itself builds on
+  [**NM512/r2dreamer**](https://github.com/NM512/r2dreamer).
+  It is included here as a first-class part of the codebase (not a git submodule) for
+  the NSMB-DS `configs/env/marionds.yaml` experiments; all credit for the original
+  NE-Dreamer design and implementation goes to its authors (see `nedreamer/LICENSE`).
+* **New Super Mario Bros. (DS)** is © Nintendo. This project uses ROM telemetry for
+  research only.

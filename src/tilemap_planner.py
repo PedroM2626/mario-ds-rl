@@ -46,6 +46,42 @@ class TilemapAStar:
                 self.pits.append((a, c - 1))
             c += 1
         self.pit_widths = [(a, b, b - a + 1) for (a, b) in self.pits]
+        # walls/pipes = solid rects that rise well above the walking surface (a
+        # running Mario collides and must *leap* them). Store the obstacle height per
+        # column so short 1-2 tile steps are walked up, and only tall walls/pipes
+        # (>= min_wall_tiles) trigger a leap -- leaping at small steps just throws
+        # Mario into nearby enemies.
+        self.obstacle_h = {}     # col -> tiles the wall rises above the floor
+        for r in course.rects:
+            top, bot = r["ty"], r["ty"] + r["h"]
+            for cc in range(r["tx"], r["tx"] + r["w"]):
+                fr = course.floor_row(cc)
+                if fr is not None and top <= fr - 2 and bot >= fr - 1:
+                    h = fr - top
+                    if h > self.obstacle_h.get(cc, 0):
+                        self.obstacle_h[cc] = h
+        self.obstacle_cols = set(self.obstacle_h)
+        # Walkable SURFACE height per column: the top of the solid run contiguous with
+        # the ground (ground + blocks/pipes/stairs stacked on it), ignoring floating
+        # ?-blocks/coins that Mario cannot stand on from the floor. Row 30 = floor;
+        # a smaller row = a higher surface. This unifies pits (None), pipes and the
+        # end staircase into a single height profile the controller can follow.
+        solid_rows = {}          # col -> set(rows) of any solid tile
+        for r in course.rects:
+            for cc in range(r["tx"], r["tx"] + r["w"]):
+                s = solid_rows.setdefault(cc, set())
+                for yy in range(r["ty"], r["ty"] + r["h"]):
+                    s.add(yy)
+        self.surface = {}        # col -> top walkable row (or absent = pit)
+        for cc in range(self.min_col, self.max_col + 1):
+            fr = course.floor_row(cc)
+            if fr is None:
+                continue
+            top = fr
+            rows = solid_rows.get(cc, set())
+            while (top - 1) in rows:      # climb contiguous solids above the floor
+                top -= 1
+            self.surface[cc] = top
         # takeoff column = last solid before a pit; landing = first solid after it
         self.takeoffs = {}      # takeoff_col -> (pit_start, pit_end, landing_col, width)
         for (a, b) in self.pits:
@@ -81,6 +117,27 @@ class TilemapAStar:
         if tk in self.takeoffs and self.takeoffs[tk][3] >= 3:
             return True, self.takeoffs[tk][3]
         return False, 0
+
+    def wall_ahead(self, mario_abs_px, look_tiles=3, min_wall_tiles=3):
+        """Tiles until the next tall pipe/wall Mario would run into (0 = none).
+        Only walls rising >= ``min_wall_tiles`` above the floor count, so 1-2 tile
+        steps are walked up rather than leapt into nearby enemies. Used to trigger a
+        *running* leap while Mario still has forward speed, since a standstill jump
+        is too short to clear a ~4-tile pipe."""
+        col = int(mario_abs_px / TILE)
+        for d in range(1, look_tiles + 1):
+            if self.obstacle_h.get(col + d, 0) >= min_wall_tiles:
+                return d
+        return 0
+
+    def surface_ahead(self, mario_abs_px, look_tiles=4):
+        """Height profile of the walkable surface over the next columns.
+        Returns (cur_row, [(col, row_or_None), ...]) where a smaller row is higher and
+        None is a pit. The controller compares these to decide walk / hop / leap."""
+        col = int(mario_abs_px / TILE)
+        cur = self.surface.get(col)
+        prof = [(col + d, self.surface.get(col + d)) for d in range(1, look_tiles + 1)]
+        return cur, prof
 
     def _gap_width_at(self, col):
         for (a, b) in self.pits:
