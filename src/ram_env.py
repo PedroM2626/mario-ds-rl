@@ -32,6 +32,13 @@ OBS_DIM = 8 + 3 * N_ENEMIES
 GEO_DIM = 6  # Pit flags for the 6 columns ahead
 MAX_STEPS = 1000
 
+# Action -> held DS buttons. Discovered empirically (see docs): the face button
+# A is JUMP and X (or Y) is the RUN/DASH button (doubles speed 1.5->3.0 px/frame),
+# enabling running jumps that clear the 64-80 px pits. B is inert in this control
+# scheme. Index layout is also mirrored in pinn_world_model.N_ACTIONS.
+#   0 noop | 1 right | 2 right+jump | 3 right+dash | 4 right+dash+jump
+#   5 left  | 6 dash+jump (broad running leap) | 7 jump in place
+
 
 class MarioRamEnv(gym.Env):
     metadata = {"render_modes": []}
@@ -42,7 +49,7 @@ class MarioRamEnv(gym.Env):
         self.state_path = state_path
         self.max_steps = max_steps
         self.geo = geo
-        self.action_space = spaces.Discrete(6)
+        self.action_space = spaces.Discrete(8)
         dim = OBS_DIM + (GEO_DIM if geo else 0)
         self.observation_space = spaces.Box(low=-10.0, high=10.0,
                                             shape=(dim,), dtype=np.float32)
@@ -115,18 +122,22 @@ class MarioRamEnv(gym.Env):
         # Origin fixed after first poll
         return obs, {}
 
+    def _action_keys(self, action):
+        R, L, A, X = Keys.KEY_RIGHT, Keys.KEY_LEFT, Keys.KEY_A, Keys.KEY_X
+        table = {
+            0: [],
+            1: [R],
+            2: [R, A],            # walk + jump
+            3: [R, X],            # dash (run)
+            4: [R, X, A],         # dash + jump  -> running leap
+            5: [L],
+            6: [X, A],            # jump in place with dash spin
+            7: [A],               # jump in place
+        }
+        return table.get(int(action), [])
+
     def step(self, action):
-        keys = []
-        if action == 1:
-            keys.append(Keys.KEY_RIGHT)
-        elif action == 2:
-            keys.extend([Keys.KEY_RIGHT, Keys.KEY_B])
-        elif action == 3:
-            keys.extend([Keys.KEY_RIGHT, Keys.KEY_B, Keys.KEY_A])
-        elif action == 4:
-            keys.append(Keys.KEY_LEFT)
-        elif action == 5:
-            keys.append(Keys.KEY_A)
+        keys = self._action_keys(action)
         for key in keys:
             self.emu.input.keypad_add_key(keymask(key))
         for _ in range(self.frameskip):

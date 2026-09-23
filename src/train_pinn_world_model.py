@@ -57,7 +57,9 @@ def collect(env, n_transitions, behavior="forward", seed=0):
     (s, a, s_next, reward, terminated) transitions."""
     rng = np.random.default_rng(seed)
     if behavior == "forward":
-        p = np.array([0.10, 0.35, 0.35, 0.10, 0.05, 0.05])  # emphasise right + jumps
+        # emphasise right + dash + running jumps so the model sees high-speed data
+        # order: 0 noop,1 right,2 right+jump,3 right+dash,4 right+dash+jump,5 left,6 dash+jump,7 jump
+        p = np.array([0.05, 0.20, 0.13, 0.20, 0.30, 0.03, 0.03, 0.03])
     else:
         p = np.full(N_ACTIONS, 1.0 / N_ACTIONS)
     p = p / p.sum()
@@ -119,8 +121,12 @@ def train_model(data, model, device, epochs, lr=1e-3, wd=1e-5, bs=64, verbose=Tr
         tot = 0.0
         for i in range(0, n, bs):
             idx = perm[i:i + bs]
-            ns, r, lc = model(St[idx], At[idx])
-            loss_dyn = (F.smooth_l1_loss(ns, S2t[idx], reduction="none") * dim_w).mean()
+            ns, r, lc, logvar = model(St[idx], At[idx])
+            err = (ns - S2t[idx]) ** 2
+            # heteroscedastic Gaussian NLL on the transition (learned uncertainty),
+            # dimension-weighted toward the planning-critical kinematics.
+            nll = 0.5 * torch.exp(-logvar) * err + 0.5 * logvar
+            loss_dyn = (nll * dim_w).mean()
             loss_rew = F.mse_loss(r, Rt[idx])
             loss_cont = F.binary_cross_entropy_with_logits(lc, 1.0 - Dt[idx])
             loss = loss_dyn + loss_rew + 0.5 * loss_cont
@@ -128,7 +134,7 @@ def train_model(data, model, device, epochs, lr=1e-3, wd=1e-5, bs=64, verbose=Tr
             tot += loss.item() * len(idx)
         model.eval()
         with torch.no_grad():
-            ns, r, lc = model(Sv, Av)
+            ns, r, lc, _ = model(Sv, Av)
             val = F.smooth_l1_loss(ns, S2v).item() + F.mse_loss(r, Rv).item()
         sched.step(val)
         hist.append(val)
@@ -155,7 +161,7 @@ def eval_metrics(model, data, device, rollout_len=120):
     model.eval()
     St = torch.as_tensor(S, device=device)
     a_oh = F.one_hot(torch.as_tensor(A, device=device), N_ACTIONS).float()
-    ns, r, lc = model(St, a_oh)
+    ns, r, lc, logvar = model(St, a_oh)
     mse = F.mse_loss(ns, torch.as_tensor(S2, device=device)).item()
     vx = ns[:, IDX_VX]; vy = ns[:, IDX_VY]
     rx = (ns[:, IDX_X] - St[:, IDX_X] - vx * EULER_K).abs().mean().item()
@@ -177,7 +183,7 @@ def eval_metrics(model, data, device, rollout_len=120):
             s = St[t0:t0 + 1].clone()
             for t in range(span):
                 ai = torch.as_tensor([A[t0 + t]], device=device)
-                s, _, _ = model.step_batch(s, ai)
+                s = model.step_batch(s, ai)[0]
             gt_x = S[t0 + span, IDX_X]; gt_y = S[t0 + span, IDX_Y]
             drift.append(np.hypot(s[0, IDX_X].item() - gt_x, s[0, IDX_Y].item() - gt_y) * 512)
             horizons.append(span)

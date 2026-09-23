@@ -38,7 +38,7 @@ from gymnasium import spaces
 
 # --- fixed state-space geometry -----------------------------------------
 OBS_DIM = 23
-N_ACTIONS = 6
+N_ACTIONS = 8  # matches MarioRamEnv.ACTION_KEYS (adds dash / running-jump actions)
 IDX_X, IDX_Y, IDX_VX, IDX_VY = 0, 1, 2, 3
 KINEMATIC = (IDX_X, IDX_Y, IDX_VX, IDX_VY)
 # Normalised Euler step factor: x_{t+1} = x_t + K * v_{x,t+1}, K = 1/16.
@@ -82,13 +82,14 @@ class ShapingConfig:
     """
 
     def __init__(self, progress=4.0, enemy=3.5, pit=1.5, step=0.02,
-                 enemy_x_sigma=48.0, enemy_y_sigma=42.0):
+                 enemy_x_sigma=48.0, enemy_y_sigma=42.0, uncertainty=0.0):
         self.progress = progress
         self.enemy = enemy
         self.pit = pit
         self.step = step
         self.ex_s = enemy_x_sigma
         self.ey_s = enemy_y_sigma
+        self.uncertainty = uncertainty
 
 
 ENEMY_DX = [8, 11, 14]
@@ -103,11 +104,12 @@ def shaped_step(model, s, action, cfg: ShapingConfig):
                      + progress * cam_delta
                      - enemy    * sum_k active_k * gauss(dx) * gauss(dy)
                      - pit      * on_ground * (1 - flag[nearest ahead])
+                     - uncertainty * sum_k active_k * sigma(dx_k)   (pessimism)
                      - step     * 1
     All terms are vectorised over the leading batch dimension.
     """
     a = encode_action_t(action).to(s.dtype)
-    ns, r, logit_cont = model(s, a)
+    ns, r, logit_cont, logvar = model(s, a)
     p = torch.sigmoid(logit_cont)
     cam_delta = (ns[:, 7] - s[:, 7]).clamp(min=0.0)
     ex = ns[:, ENEMY_DX] * 256.0            # px, egocentric
@@ -118,9 +120,14 @@ def shaped_step(model, s, action, cfg: ShapingConfig):
     gy = torch.exp(-((ey.abs() / cfg.ey_s) ** 2))
     enemy_danger = (active * gx * gy).sum(dim=-1)
     pit_danger = ns[:, 4] * (1.0 - ns[:, 17])  # on ground with a pit in the next column
+    # epistemic-style pessimism: penalise plans whose value rests on unpredictable
+    # enemy motion (heteroscedastic sigma on the enemy-x dimensions).
+    sigma_ex = torch.exp(0.5 * logvar[:, ENEMY_DX])
+    unc = (active * sigma_ex).sum(dim=-1)
     shaped = (r + cfg.progress * cam_delta
               - cfg.enemy * enemy_danger
               - cfg.pit * pit_danger
+              - cfg.uncertainty * unc
               - cfg.step)
     return ns, shaped, p
 
@@ -144,6 +151,10 @@ class MarioPINNWorldModel(nn.Module):
         sizes = [obs_dim + n_actions] + [hid] * layers
         self.trunk = _mlp(sizes)
         self.head_delta = nn.Linear(hid, obs_dim)
+        # heteroscedastic per-dimension log-variance of the next state: lets the
+        # planner read *where the model is unsure* (chiefly enemy motion) and be
+        # pessimistic there -- the probabilistic world-model head.
+        self.head_logvar = nn.Linear(hid, obs_dim)
         self.head_reward = nn.Sequential(nn.Linear(hid, hid // 2), nn.GELU(),
                                          nn.Linear(hid // 2, 1))
         self.head_continue = nn.Sequential(nn.Linear(hid, hid // 2), nn.GELU(),
@@ -153,6 +164,7 @@ class MarioPINNWorldModel(nn.Module):
         z = torch.cat([s, a_onehot], dim=-1)
         h = self.trunk(z)
         delta = self.head_delta(h)
+        logvar = self.head_logvar(h).clamp(-8.0, 4.0)
         reward = self.head_reward(h).squeeze(-1)
         logit_cont = self.head_continue(h).squeeze(-1)
 
@@ -164,14 +176,14 @@ class MarioPINNWorldModel(nn.Module):
         ns[:, IDX_VY] = vy
         ns[:, IDX_X] = s[:, IDX_X] + vx * self.k   # EXACT integration, zero residual
         ns[:, IDX_Y] = s[:, IDX_Y] + vy * self.k
-        return ns, reward, logit_cont
+        return ns, reward, logit_cont, logvar
 
     @torch.no_grad()
     def step_batch(self, s, actions):
-        """s:(B,obs) actions:(B,) integers -> (next_s, reward, continue_prob)."""
+        """s:(B,obs) actions:(B,) integers -> (next_s, reward, continue_prob, logvar)."""
         a = encode_action_t(actions).to(s.dtype).to(s.device)
-        ns, r, lc = self.forward(s, a)
-        return ns, r, torch.sigmoid(lc)
+        ns, r, lc, logvar = self.forward(s, a)
+        return ns, r, torch.sigmoid(lc), logvar
 
 
 class PINNRollout:

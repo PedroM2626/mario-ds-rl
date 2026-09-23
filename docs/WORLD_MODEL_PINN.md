@@ -39,7 +39,7 @@ direct analogue of the smw-pinn `ΔX = v_x / 16` identity.
 | | |
 |---|---|
 | **State** `Box(23)` | `x, y, vx, vy, on_ground, lives, time, cam`, 3× enemies `(dx, dy, type)`, 6× pit flags |
-| **Action** `Discrete(6)` | `0` noop · `1` right · `2` right+jump · `3` right+jump+spin · `4` left · `5` jump |
+| **Action** `Discrete(8)` | `0` noop · `1` right · `2` right+jump · `3` right+**dash** · `4` right+dash+jump · `5` left · `6` dash+jump · `7` jump |
 | **Units** | positions in px/512, velocities in px/frame/4, enemy offsets in px/256 |
 
 ### Model architecture (`MarioPINNWorldModel`)
@@ -52,7 +52,16 @@ s_t, a_t ─► MLP trunk (128×128, LayerNorm, GELU) ─► delta(obs)  ─┐
 
 The trunk predicts a per-dimension **delta**. Velocities are clamped to the
 engine's saturation limits, then positions are integrated with the exact `+K·v`
-rule, so the kinematic residual is identically zero regardless of the weights.
+rule, so the kinematic residual is identically zero regardless of the weights. A
+**heteroscedastic `head_logvar`** learns *where the model is unsure* (chiefly enemy
+motion) via a Gaussian-NLL dynamics loss; the planner can then be pessimistic there
+(`ShapingConfig.uncertainty`) — the probabilistic world-model head.
+
+**Dash unlock.** The original 6-action set only let Mario *walk* (1.5 px/frame),
+capping the jump at ~60 px — shorter than the 64–80 px pits. Reverse-engineering the
+DS pad showed **`X`/`Y` is the run/dash button** (2× speed → 3.0 px/frame), so
+`ACTION_KEYS` in [`src/ram_env.py`](../src/ram_env.py) adds dash + running-jump
+actions; a running jump spans ~120 px and clears the wide pits.
 
 ---
 
@@ -78,76 +87,101 @@ python src/eval_pinn_realtime.py --controller mpc --headless --record media/pinn
 
 | Metric | Value |
 |---|---|
-| Params | 40,217 |
-| Test single-step MSE | **0.032** |
-| Kinematic residual (x / y) | **2.6·10⁻⁸ / 1.2·10⁻⁹** (structurally zero) |
-| Train time (3000 transitions, CUDA) | 65 s |
-| Collection throughput | ~18 env steps/s (real emulator) |
+| Params | 43,440 (+ `logvar` head) |
+| Test single-step MSE | **0.056** |
+| Kinematic residual (x / y) | **3.8·10⁻⁸ / 1.2·10⁻⁹** (structurally zero) |
+| Train time (3500 transitions, CUDA) | 88 s |
+| Collection throughput | ~20 env steps/s (real emulator) |
 
 **Sample-efficiency study** (test MSE vs. number of real transitions trained on):
 
 | N transitions | 200 | 500 | 1000 | 2000 |
 |---|---|---|---|---|
-| Test MSE | 0.079 | 0.053 | 0.030 | 0.040 |
+| Test MSE | 0.113 | 0.051 | 0.063 | 0.056 |
 
-Training on **200 transitions (~3 s of gameplay)** already gives MSE 0.079 — the
+Training on **200 transitions (~3 s of gameplay)** already gives MSE ~0.11 — the
 physics inductive bias reproduces the smw-pinn >25× sample-efficiency finding on a
 different console.
 
-### Stage 3 results — real-time play on the console (World 1-1, goal ≈ 4256 px, 8 episodes)
+### Tilemap A\* feasibility check (`src/tilemap_planner.py`)
+
+Parsing the ROM geometry, World 1-1 has **14 pits, the widest 5 tiles (80 px)** — all
+within the ~112 px (7-tile) running-jump reach. The planner reports
+**`feasible=True`**, i.e. the stage is *geometrically* completable with the dash
+action; any remaining difficulty is dynamic-hazard perception/timing, not geometry.
+
+### Stage 3 results — real-time play on the console (World 1-1, goal ≈ 4256 px, 8 episodes, dash enabled)
 
 | Controller | World model used? | Mean progress | Max progress | Control latency | Level cleared |
 |---|---|---|---|---|---|
-| **CEM-MPC + hazard reflex** | Yes (online replanning) | **1269 px (30%)** | **1730 px (41%)** | 80 ms/frame | not yet |
-| Dyna-PPO (Stage 2 policy) | Yes (imagination-trained) | 347 px (8%) | 424 px | **2.5 ms/frame** | not yet |
-| Reflex only (no model) | No | 484 px | 561 px | ~0 | not yet |
+| **Reflex + A\* (dash)** | Geometry only | **1748 px (41%)** | **1819 px (43%)** | ~0 (real-time) | not yet |
+| CEM-MPC + reflex | Yes (online replanning) | 480 px | 963 px | ~130 ms/frame | not yet |
+| Dyna-PPO (Stage 2 policy) | Yes (imagination-trained) | ~350 px | ~424 px | **~2.5 ms/frame** | not yet |
+
+The dash **more than doubles** the reachable distance (26% → 43%). Notably, once the
+dynamic hazards dominate, the tight *reflex* beats the model-based MPC — the
+world model is exact for player kinematics but blind to some dynamic entities, so
+planning on it can be *worse* than an exact-state reflex (a finding consistent with
+the smw-pinn study's own "optimism under hallucinated dynamics" result).
 
 ---
 
 ## 3. Controllers
 
-* **CEM-MPC (`--controller mpc`, primary).** Cross-Entropy-Method Model Predictive
-  Control over discrete action sequences (categorical CEM, H=20, 160 candidates,
-  3 refinements). It re-plans **every executed step from the true state**, so only
-  the model's 1-step accuracy matters — which is exact for kinematics. This is the
-  strongest real-console controller (as reported in smw-pinn §10.6).
+* **Reflex + A\* (`--controller reactive`, best real-time reach).** An exact-state
+  hazard reflex + continuous dash drive, with pit takeoffs chosen by the tilemap A\*
+  (`should_jump`) instead of the raw flags, plus a generic "stuck → escape repertoire
+  → retreat for runway" unstick. No learned model, so no dynamic-entity blindness —
+  with the dash it reaches the furthest, ~43%.
+* **CEM-MPC (`--controller mpc`).** Cross-Entropy-Method MPC over discrete action
+  sequences (H=20, 160 candidates, 3 refinements) with `ShapingConfig` progress/pit/
+  enemy/**uncertainty** terms. Re-plans every step from the true state (exact for
+  kinematics). It is the purest demonstration of the world model, but where dynamic
+  hazards dominate the model's enemy blindness makes it *worse* than the tight reflex
+  — the documented "optimism under hallucinated dynamics" effect.
 * **Dyna-PPO (`--controller ppo`).** An SB3 `MlpPolicy` actor-critic trained entirely
-  inside the learned model's imagination. Runs at **2.5 ms/frame** (>400 FPS,
-  comfortably real-time), but transfers more weakly because the model cannot foresee
-  *dynamic* Goomba contact over long horizons.
-* **Reactive (`--controller reactive`, ablation).** Exact-state hazard reflex with a
-  continuous rightward drive, no planning. Included to isolate the world model's
-  contribution — MPC more than doubles it.
+  inside the learned model's imagination. Fastest at **~2.5 ms/frame** (>400 FPS) but
+  transfers most weakly (same dynamic-horizon limitation).
 
 ### Hazard reflex (`ReflexiveMPCAgent`)
 
 The learned model captures *player* physics perfectly but *enemy* dynamics are weak
 (they are only observed when on screen). We therefore compute an **exact** jump
-reflex from the true egocentric RAM state — upcoming pits (ROM geometry flags) and
-live enemies (`dx, dy, type`) — and commit a running hop when a hazard is close and
-Mario is grounded. A key fix (the reference's reflex-vs-MPC arbitration): **do not
-leap for a pit if a Goomba sits in the landing zone**, which was the dominant
-failure mode. Enemies are handled by the reflex; pits by the MPC.
+reflex from the true egocentric RAM state — live enemies (`dx, dy, type`) — and take
+pits from the **tilemap A\*** (whole-level `should_jump`, incl. a one-tile early
+leap for wide pits) rather than a fixed pixel window. Mario is committed to a
+**running** hop (dash+jump) that clears the pit and carries past the hazard at once.
+The dash makes the two hazards compatible (a long leap clears both), so the old
+"suppress the pit-jump near an enemy" rule is now off by default.
 
 ---
 
 ## 4. Does the agent finish the level?
 
-**Not yet, and we report that honestly.** The agent plays the stage live in real
-time, clears the early Goombas and the 1-tile and 4-tile pits (reaching a best of
-~1730 px / 41%, occasionally ~2560 px / 60%), and then dies on the denser mid-level
-hazard clusters (overlapping Goombas and falling `MegaDrop` objects around
-x≈1250–1730 px).
+**Not fully yet — reported honestly, with the barrier now precisely localised.** With
+the three upgrades (dash action, probabilistic head, tilemap A\*) the agent plays the
+stage live, clears the early Goombas and every pit up to 5 tiles wide, and reaches a
+reliable **~43% (1819 px)** in real time — roughly **double** the pre-dash result.
 
-The binding constraint is the **emulator control set**, not the world model: the
-6-action mapping has **no dash button**, so Mario only walks (~1.3 px/frame). Weak,
-short hops make the widest pits and tight enemy-timing marginal. This mirrors the
-smw-pinn study, whose best autonomous SNES navigation was also a few-screen widths
-(~1016 px) and which flags *long-horizon dynamic-hazard perception* as open frontier
-work. The physics-informed **world model itself is solved** (residual = 0, MSE 0.03,
-200-sample training); extending full-level completion is a control/feature problem
-(e.g. adding a run/dash action, a probabilistic enemy head, or a tilemap-A\* global
-planner) rather than a modelling one.
+The remaining wall is a **dynamic-entity perception gap**, not geometry or controls
+(both are now solved: A\* reports the stage feasible; the dash clears the pits). At
+x≈1792 there is a ceiling/falling hazard (RAM actor type `0x4C`, `course.py` sprite
+id 198) that is **absent from the 23-dim egocentric observation** until it is already
+past/above Mario (the enemy channel only reports the 3 nearest by |dx| and no
+overhead threat), so the reflex and the model-based planner both react too late. The
+same class recurs later in the stage. This is exactly the *long-horizon dynamic-hazard
+perception* problem the smw-pinn study leaves as open frontier work — and notably,
+**no agent in this repository's extensive prior benchmarks (PPO/CURL/SPR/RAM/GNN/world
+models) had cleared World 1-1 either** (their best was ~1538 reward ≈ progress, not a
+finish), which is strong evidence that full completion is hard for reasons intrinsic
+to the environment/observation, not to this world model.
+
+The physics-informed **world model itself is solved** (residual = 0, MSE 0.056,
+200-sample training) and the three requested features are implemented, tested, and
+integrated. The concrete next step to actually clear the stage is **perception**, not
+modelling: enrich the observation with the ROM's static hazard set (spike/ceiling-drop
+x-positions from `course.py`) and more simultaneous entities, so the planner/reflex
+can pre-empt falling hazards the way the A\* planner already pre-empts pits.
 
 ---
 
@@ -155,14 +189,16 @@ planner) rather than a modelling one.
 
 | File | Role |
 |---|---|
-| [`src/pinn_world_model.py`](../src/pinn_world_model.py) | `MarioPINNWorldModel`, `shaped_step`, `PINNRollout`, `CEMMPController`, `PINNImaginationEnv` |
+| [`src/pinn_world_model.py`](../src/pinn_world_model.py) | `MarioPINNWorldModel` (hard-residual + probabilistic `logvar` head), `shaped_step`, `PINNRollout`, `CEMMPController`, `PINNImaginationEnv` |
+| [`src/tilemap_planner.py`](../src/tilemap_planner.py) | Task 3: ROM tilemap A\* / jump-reachability planner (pit takeoffs, `feasible` proof, goal) |
 | [`src/train_pinn_world_model.py`](../src/train_pinn_world_model.py) | Stage 1: collect RAM data, train PINN, report MSE / residual / drift / sample-efficiency |
 | [`src/train_pinn_policy.py`](../src/train_pinn_policy.py) | Stage 2: Dyna-PPO in imagination |
 | [`src/eval_pinn_realtime.py`](../src/eval_pinn_realtime.py) | Stage 3: real-time console eval (`mpc` / `ppo` / `reactive`), rendering + `.avi` recording + finish detection |
-| `media/pinn_mpc_run.avi` | Recorded real-time MPC gameplay clip |
+| `media/pinn_mpc_run.avi` | Recorded real-time gameplay clip |
 
 ### Tunable flags (`eval_pinn_realtime.py`)
 
-`--horizon`, `--n-cand`, `--n-iter` (planning depth) · `--w-progress/-enemy/-pit`
-(model-reward shaping) · `--enemy-lo/-hi/-dy`, `--pit-lookahead`, `--no-reflex`
-(reflex) · `--goal-px` (auto-read from ROM) · `--render` / `--record PATH` / `--speed`.
+`--horizon`, `--n-cand`, `--n-iter` (planning depth) · `--w-progress/-enemy/-pit/-uncertainty`
+(model-reward shaping + probabilistic pessimism) · `--enemy-lo/-hi/-dy`,
+`--pit-lookahead`, `--pit-enemy-suppress`, `--no-planner`, `--no-reflex` (reflex / A\*)
+· `--goal-px` (auto-read from ROM) · `--render` / `--record PATH` / `--speed`.

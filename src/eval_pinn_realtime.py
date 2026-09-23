@@ -34,6 +34,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ram_env import MarioRamEnv  # noqa: E402
 from pinn_world_model import MarioPINNWorldModel, CEMMPController, N_ACTIONS, ShapingConfig  # noqa: E402
 from course import Course, TILE  # noqa: E402
+from tilemap_planner import TilemapAStar  # noqa: E402
 
 ROM = "data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).nds"
 STATE = "data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).ds1"
@@ -94,18 +95,37 @@ class ReflexiveMPCAgent:
     """
 
     name = "mpc+reflex"
-    JUMP = 2   # run-right + jump
-    RUN = 1    # run-right
+    JUMP = 4   # right + dash + jump  (running leap)
+    RUN = 3    # right + dash         (maintain running speed)
+    LEFT = 5   # used briefly to gain runway when deeply stuck
+    STUCK_ACTIONS = (4, 2, 6, 5)  # escape repertoire: run-jump, walk-jump, dash+jump, jump
 
     def __init__(self, model, device, horizon, n_cand, n_iter, seed, cfg=None,
                  enemy_lo=8.0, enemy_hi=42.0, enemy_dy=60.0, pit_lookahead=3, enabled=True,
-                 pit_enemy_suppress=150.0):
+                 pit_enemy_suppress=0.0, planner=None):
         self.mpc = MPCAgent(model, device, horizon, n_cand, n_iter, seed, cfg)
         self.enabled = enabled
         self.enemy_lo, self.enemy_hi, self.enemy_dy = enemy_lo, enemy_hi, enemy_dy
         self.pit_lookahead = pit_lookahead
         self.pit_enemy_suppress = pit_enemy_suppress
+        self.planner = planner     # TilemapAStar: whole-level precise takeoff, else obs flags
         self.clearing = False   # mid jump-over-hazard: carry momentum through
+        self._last_x = None     # for generic "blocked by wall/ledge" detection
+        self._stuck = 0
+        self._escape = 0
+        self._retreat = 0
+
+    def _pit_threat(self, obs):
+        """Pit takeoff decision: global A* plan if available, else local ROM flags."""
+        if self.planner is not None:
+            abs_px = SPAWN_ABS_PX + obs[0] * 512.0
+            jump, _width = self.planner.should_jump(abs_px)
+            if jump:
+                return "pit"
+            return None
+        if self.pit_lookahead > 0 and any(obs[17 + c] < 0.5 for c in range(self.pit_lookahead)):
+            return "pit"
+        return None
 
     def _threat(self, obs):
         ene = 1e9
@@ -117,29 +137,47 @@ class ReflexiveMPCAgent:
                 return "enemy"
             if et > 1.0 and abs(dy) < self.enemy_dy and 0 < dx:
                 ene = min(ene, dx)
-        # Do not leap for a pit if a Goomba sits in the landing zone: that was the
-        # dominant failure mode (jumping sideways into the enemy). Defer to MPC.
-        if self.pit_lookahead > 0 and ene > self.pit_enemy_suppress:
-            if any(obs[17 + c] < 0.5 for c in range(self.pit_lookahead)):
-                return "pit"
-        return None
+        if ene <= self.pit_enemy_suppress:
+            return None                          # a hazard sits in the landing zone
+        return self._pit_threat(obs)
 
     def act(self, obs):
         on_ground = obs[4] > 0.5
         vy = obs[3]
+        # generic blocked detection: driving right but not advancing => wall/ledge
+        if self._last_x is not None and on_ground:
+            self._stuck = self._stuck + 1 if obs[0] - self._last_x < 0.0004 else 0
+        else:
+            self._stuck = 0
+        self._last_x = obs[0]
+        if self._retreat > 0:                 # back off to build a running-jump runway
+            self._retreat -= 1
+            return self.LEFT
         if self.enabled and self.clearing:
             if not on_ground:
-                # carry forward momentum through the hop (re-pressing the jump key
-                # mid-air truncates it, so we hold run-right only)
                 return self.RUN
-            self.clearing = False  # landed; re-assess (may need another leap)
-        if self.enabled and on_ground and vy > -0.05 and self._threat(obs) is not None:
+            self.clearing = False
+        blocked = self._stuck >= 3
+        threat = self._threat(obs) if self.enabled else None
+        if self.enabled and on_ground and vy > -0.05 and (blocked or threat is not None):
             self.clearing = True
+            if blocked:                       # escalate an escape repertoire, then retreat
+                self._escape = (self._escape + 1) % len(self.STUCK_ACTIONS)
+                if self._stuck >= 9:
+                    self._stuck = 0
+                    self._retreat = 3
+                return self.STUCK_ACTIONS[self._escape]
+            self._stuck = 0
+            self._escape = 0
             return self.JUMP
         return self.mpc.act(obs)
 
     def reset(self):
         self.clearing = False
+        self._last_x = None
+        self._stuck = 0
+        self._escape = 0
+        self._retreat = 0
         self.mpc.reset()
 
 
@@ -167,7 +205,12 @@ class ReactiveAgent(ReflexiveMPCAgent):
         self.enemy_dy = k.pop("enemy_dy", 60.0)
         self.pit_lookahead = k.pop("pit_lookahead", 3)
         self.pit_enemy_suppress = k.pop("pit_enemy_suppress", 150.0)
+        self.planner = k.pop("planner", None)
         self.clearing = False
+        self._last_x = None
+        self._stuck = 0
+        self._escape = 0
+        self._retreat = 0
 
 
 class PPOAgent:
@@ -275,30 +318,40 @@ def main():
     ap.add_argument("--w-pit", type=float, default=0.0)
     ap.add_argument("--no-reflex", action="store_true", help="disable hazard reflex")
     ap.add_argument("--enemy-lo", type=float, default=8.0)
-    ap.add_argument("--enemy-hi", type=float, default=30.0)
+    ap.add_argument("--enemy-hi", type=float, default=55.0)
     ap.add_argument("--enemy-dy", type=float, default=60.0)
-    ap.add_argument("--pit-lookahead", type=int, default=0, help="0 = let MPC handle pits (recommended)")
+    ap.add_argument("--pit-lookahead", type=int, default=1, help="jump at the pit edge (A*-like takeoff)")
+    ap.add_argument("--w-uncertainty", type=float, default=0.6,
+                    help="pessimism on unpredictable enemy motion (probabilistic head)")
+    ap.add_argument("--pit-enemy-suppress", type=float, default=0.0,
+                    help="skip pit-jump if an enemy is within this many px (0=always jump)")
+    ap.add_argument("--no-planner", action="store_true", help="disable the tilemap A* planner")
     args = ap.parse_args()
 
     render = args.render and not args.headless
     device = args.device
     goal = args.goal_px or goal_px()
-    print(f"[pinn-eval] controller={args.controller} device={device} goal_abs_px={goal}")
+    planner = None if args.no_planner else TilemapAStar(rom_path=args.rom)
+    print(f"[pinn-eval] controller={args.controller} device={device} goal_abs_px={goal} "
+          f"A*planner={'on' if planner is not None else 'off'}")
 
     if args.controller == "mpc":
         ck = torch.load(args.model, map_location=device, weights_only=False)
         model = MarioPINNWorldModel(hid=ck["hid"]).to(device); model.load_state_dict(ck["state_dict"]); model.eval()
-        cfg = ShapingConfig(progress=args.w_progress, enemy=args.w_enemy, pit=args.w_pit)
+        cfg = ShapingConfig(progress=args.w_progress, enemy=args.w_enemy, pit=args.w_pit,
+                            uncertainty=args.w_uncertainty)
         make_agent = lambda: ReflexiveMPCAgent(model, device, args.horizon, args.n_cand,
                                                args.n_iter, args.seed, cfg,
                                                enemy_lo=args.enemy_lo, enemy_hi=args.enemy_hi,
                                                enemy_dy=args.enemy_dy, pit_lookahead=args.pit_lookahead,
-                                               enabled=not args.no_reflex)
+                                               pit_enemy_suppress=args.pit_enemy_suppress,
+                                               planner=planner, enabled=not args.no_reflex)
     elif args.controller == "reactive":
         make_agent = lambda: ReactiveAgent(
             None, device, args.horizon, args.n_cand, args.n_iter, args.seed,
             enemy_lo=args.enemy_lo, enemy_hi=args.enemy_hi, enemy_dy=args.enemy_dy,
-            pit_lookahead=args.pit_lookahead, enabled=not args.no_reflex)
+            pit_lookahead=args.pit_lookahead, pit_enemy_suppress=args.pit_enemy_suppress,
+            planner=planner, enabled=not args.no_reflex)
     else:
         make_agent = lambda: PPOAgent(args.policy, device)
 
