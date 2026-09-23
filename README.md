@@ -267,6 +267,19 @@ python src/train_gnn.py --timesteps 100000 --num-envs 2 --run-id gnn_100k
 
 ---
 
+### 14. Physics-Informed (PINN) World Model — Fast Training + Real-Time Play
+Ported in methodology from [`PedroM2626/smw-pinn`](https://github.com/PedroM2626/smw-pinn) (Super Mario World) to **New Super Mario Bros. DS**, built on the RAM-telemetry stack. A **Hard-Residual PINN** world model embeds the engine's exact discrete integration `x_{t+1}=x_t+v_{x,t+1}/16` (verified on real data) into the computation graph, learning only the un-modelled force/contact residual. Result: trained from **~200 real transitions in ≈1 minute** to test MSE **0.032** with a **structurally zero kinematic residual**. Three-stage pipeline:
+
+```bash
+python src/train_pinn_world_model.py --transitions 3000 --epochs 300 --sample-efficiency   # Stage 1: world model
+python src/train_pinn_policy.py --timesteps 200000 --n-envs 8                              # Stage 2: Dyna-PPO in imagination
+python src/eval_pinn_realtime.py --controller mpc --render                                 # Stage 3: real-time on console
+```
+
+**Real-time console results** (World 1-1, goal ≈ 4256 px, 8 episodes): CEM-MPC over the PINN reaches a mean **1269 px (30%)**, best **1730 px (41%)** at ~80 ms/frame; the imagination PPO policy runs at **2.5 ms/frame** (>400 FPS). The world model roughly doubles a model-free reflex ablation. The agent plays live and clears the early pits/Goombas but does **not yet fully finish** the stage (limited by the walk-only 6-action control set). Full methodology, ablations and honest limitations: **[`docs/WORLD_MODEL_PINN.md`](docs/WORLD_MODEL_PINN.md)**. Recorded clip: `media/pinn_mpc_run.avi`.
+
+---
+
 ## 💾 Experiment Management (MLOps)
 
 ### Run Versioning

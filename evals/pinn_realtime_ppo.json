@@ -1,0 +1,111 @@
+{
+  "aggregate": {
+    "controller": "ppo",
+    "episodes": 8,
+    "goal_abs_px": 4256,
+    "clear_rate": 0.0,
+    "mean_progress_px": 347.49609375,
+    "max_progress_px": 424.49609375,
+    "mean_reward": 61.40166015625006,
+    "mean_fps": 23.3132655188086,
+    "mean_latency_ms": 2.4548677934540644
+  },
+  "episodes": [
+    {
+      "steps": 36,
+      "total_reward": 61.40166015625006,
+      "max_progress_px": 336.49609375,
+      "final_abs_px": 424.49609375,
+      "reached_goal": false,
+      "termination": "death",
+      "mean_control_latency_ms": 5.987875991397434,
+      "achieved_env_fps": 21.910122249516473,
+      "death_diag": "abs 424px vy=-1.00 ground=0 pit=[1, 1, 1, 1, 1, 1] enemy_dx_px=[11, 0, 0] enemy_type=[160, 0, 0]",
+      "episode": 1
+    },
+    {
+      "steps": 36,
+      "total_reward": 61.40166015625006,
+      "max_progress_px": 248.49609375,
+      "final_abs_px": 336.49609375,
+      "reached_goal": false,
+      "termination": "death",
+      "mean_control_latency_ms": 1.3534161779615614,
+      "achieved_env_fps": 24.467838137400424,
+      "death_diag": "abs 336px vy=-1.00 ground=0 pit=[1, 1, 1, 1, 1, 1] enemy_dx_px=[11, 0, 0] enemy_type=[160, 0, 0]",
+      "episode": 2
+    },
+    {
+      "steps": 36,
+      "total_reward": 61.40166015625006,
+      "max_progress_px": 248.49609375,
+      "final_abs_px": 336.49609375,
+      "reached_goal": false,
+      "termination": "death",
+      "mean_control_latency_ms": 1.3703770107693143,
+      "achieved_env_fps": 24.453660058127163,
+      "death_diag": "abs 336px vy=-1.00 ground=0 pit=[1, 1, 1, 1, 1, 1] enemy_dx_px=[11, 0, 0] enemy_type=[160, 0, 0]",
+      "episode": 3
+    },
+    {
+      "steps": 36,
+      "total_reward": 61.40166015625006,
+      "max_progress_px": 248.49609375,
+      "final_abs_px": 336.49609375,
+      "reached_goal": false,
+      "termination": "death",
+      "mean_control_latency_ms": 1.7212496863471136,
+      "achieved_env_fps": 23.562762846739226,
+      "death_diag": "abs 336px vy=-1.00 ground=0 pit=[1, 1, 1, 1, 1, 1] enemy_dx_px=[11, 0, 0] enemy_type=[160, 0, 0]",
+      "episode": 4
+    },
+    {
+      "steps": 36,
+      "total_reward": 61.40166015625006,
+      "max_progress_px": 248.49609375,
+      "final_abs_px": 336.49609375,
+      "reached_goal": false,
+      "termination": "death",
+      "mean_control_latency_ms": 2.2134847111172147,
+      "achieved_env_fps": 22.483872716172552,
+      "death_diag": "abs 336px vy=-1.00 ground=0 pit=[1, 1, 1, 1, 1, 1] enemy_dx_px=[11, 0, 0] enemy_type=[160, 0, 0]",
+      "episode": 5
+    },
+    {
+      "steps": 36,
+      "total_reward": 61.40166015625006,
+      "max_progress_px": 248.49609375,
+      "final_abs_px": 336.49609375,
+      "reached_goal": false,
+      "termination": "death",
+      "mean_control_latency_ms": 2.225273185306125,
+      "achieved_env_fps": 23.531348311927662,
+      "death_diag": "abs 336px vy=-1.00 ground=0 pit=[1, 1, 1, 1, 1, 1] enemy_dx_px=[11, 0, 0] enemy_type=[160, 0, 0]",
+      "episode": 6
+    },
+    {
+      "steps": 36,
+      "total_reward": 61.40166015625006,
+      "max_progress_px": 248.49609375,
+      "final_abs_px": 336.49609375,
+      "reached_goal": false,
+      "termination": "death",
+      "mean_control_latency_ms": 2.2130476103888617,
+      "achieved_env_fps": 22.977273194165527,
+      "death_diag": "abs 336px vy=-1.00 ground=0 pit=[1, 1, 1, 1, 1, 1] enemy_dx_px=[11, 0, 0] enemy_type=[160, 0, 0]",
+      "episode": 7
+    },
+    {
+      "steps": 36,
+      "total_reward": 61.40166015625006,
+      "max_progress_px": 248.49609375,
+      "final_abs_px": 336.49609375,
+      "reached_goal": false,
+      "termination": "death",
+      "mean_control_latency_ms": 2.554217974344889,
+      "achieved_env_fps": 23.11924663641976,
+      "death_diag": "abs 336px vy=-1.00 ground=0 pit=[1, 1, 1, 1, 1, 1] enemy_dx_px=[11, 0, 0] enemy_type=[160, 0, 0]",
+      "episode": 8
+    }
+  ]
+}

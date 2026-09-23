@@ -1,0 +1,7 @@
+{
+  "timesteps": 200000,
+  "train_time_s": 752.1789391040802,
+  "steps_per_s": 265.8941770401334,
+  "n_envs": 8,
+  "imagination": "PINN world model (no emulator)"
+}
