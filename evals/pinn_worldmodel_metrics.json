@@ -1,18 +1,12 @@
 {
-  "test_mse": 0.05581457540392876,
-  "kinematic_residual_x": 3.8476482444593785e-08,
-  "kinematic_residual_y": 1.1588313642008075e-09,
-  "open_loop_drift_px_mean": 1738.4759521484375,
+  "test_mse": 0.055454328656196594,
+  "kinematic_residual_x": 3.929937264501859e-08,
+  "kinematic_residual_y": 1.10472597736333e-09,
+  "open_loop_drift_px_mean": 1620.12060546875,
   "open_loop_horizon_frames": 44.833333333333336,
   "n_drift_episodes": 18,
-  "collect_time_s": 178.81901025772095,
-  "train_time_s": 87.85558032989502,
+  "collect_time_s": 0.0,
+  "train_time_s": 52.615761041641235,
   "n_transitions": 3500,
-  "n_params": 43440,
-  "sample_efficiency_mse": {
-    "200": 0.11299826949834824,
-    "500": 0.05103655532002449,
-    "1000": 0.06276120990514755,
-    "2000": 0.05581272020936012
-  }
+  "n_params": 43440
 }

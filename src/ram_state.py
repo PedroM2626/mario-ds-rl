@@ -25,7 +25,7 @@ ODO_ADDR = 0x0209AE9C
 Y_ADDR = 0x020A703C  # Experimental (flat on ground, increases in freefall)
 VEL_ADDRS = (0x021C1904, 0x021C1928, 0x021C1940, 0x021C1A94, 0x021C1F6C)
 MARIO_BASE = 0x021C1890
-CLEAR_FLAG_ADDR = None  # Level finish flag in RAM (scanned on goal touch)
+CLEAR_FLAG_ADDR = 0x020DCF27  # Stage clear flag (offset in Area/Camera controller; verified via differential RAM search)
 OFF_TYPE, OFF_A, OFF_B, OFF_NODE = 0x44, 0x60, 0x68, 0x38
 SCAN_LO, SCAN_HI = 0x021C0000, 0x021E0000
 

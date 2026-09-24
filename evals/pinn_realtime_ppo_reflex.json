@@ -1,0 +1,75 @@
+{
+  "aggregate": {
+    "controller": "ppo+reflex",
+    "episodes": 5,
+    "goal_abs_px": 4256,
+    "clear_rate": 0.0,
+    "mean_progress_px": 375.55703125,
+    "max_progress_px": 445.95703125,
+    "mean_reward": 70.46992187500005,
+    "mean_fps": 24.781886659914747,
+    "mean_latency_ms": 1.9358256767536033
+  },
+  "episodes": [
+    {
+      "episode": 1,
+      "steps": 29,
+      "total_reward": 70.46992187500005,
+      "max_progress_px": 357.95703125,
+      "final_abs_px": 445.95703125,
+      "reached_goal": false,
+      "termination": "death",
+      "mean_control_latency_ms": 6.89,
+      "achieved_env_fps": 20.7,
+      "death_diag": "abs 446px vy=-1.00 ground=0 pit=[1, 1, 1, 1, 1, 1] enemy_dx_px=[8, 0, 0] enemy_type=[160, 0, 0]"
+    },
+    {
+      "episode": 2,
+      "steps": 29,
+      "total_reward": 70.46992187500005,
+      "max_progress_px": 357.95703125,
+      "final_abs_px": 357.95703125,
+      "reached_goal": false,
+      "termination": "death",
+      "mean_control_latency_ms": 0.7,
+      "achieved_env_fps": 26.0,
+      "death_diag": "abs 358px vy=-1.00 ground=0 pit=[1, 1, 1, 1, 1, 1] enemy_dx_px=[8, 0, 0] enemy_type=[160, 0, 0]"
+    },
+    {
+      "episode": 3,
+      "steps": 29,
+      "total_reward": 70.46992187500005,
+      "max_progress_px": 357.95703125,
+      "final_abs_px": 357.95703125,
+      "reached_goal": false,
+      "termination": "death",
+      "mean_control_latency_ms": 0.7,
+      "achieved_env_fps": 25.9,
+      "death_diag": "abs 358px vy=-1.00 ground=0 pit=[1, 1, 1, 1, 1, 1] enemy_dx_px=[8, 0, 0] enemy_type=[160, 0, 0]"
+    },
+    {
+      "episode": 4,
+      "steps": 29,
+      "total_reward": 70.46992187500005,
+      "max_progress_px": 357.95703125,
+      "final_abs_px": 357.95703125,
+      "reached_goal": false,
+      "termination": "death",
+      "mean_control_latency_ms": 0.6,
+      "achieved_env_fps": 25.7,
+      "death_diag": "abs 358px vy=-1.00 ground=0 pit=[1, 1, 1, 1, 1, 1] enemy_dx_px=[8, 0, 0] enemy_type=[160, 0, 0]"
+    },
+    {
+      "episode": 5,
+      "steps": 29,
+      "total_reward": 70.46992187500005,
+      "max_progress_px": 357.95703125,
+      "final_abs_px": 357.95703125,
+      "reached_goal": false,
+      "termination": "death",
+      "mean_control_latency_ms": 0.8,
+      "achieved_env_fps": 25.6,
+      "death_diag": "abs 358px vy=-1.00 ground=0 pit=[1, 1, 1, 1, 1, 1] enemy_dx_px=[8, 0, 0] enemy_type=[160, 0, 0]"
+    }
+  ]
+}

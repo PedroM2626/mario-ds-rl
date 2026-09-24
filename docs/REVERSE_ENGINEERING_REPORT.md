@@ -10,7 +10,7 @@
 
 ## Abstract
 
-This report documents the reverse engineering of the Nintendo DS title *New Super Mario Bros.* (EUR release NTR-A2DP-EUR) to support physics-informed world models, offline dataset generation, and direct RAM-telemetry reinforcement learning. We report both verified structural truths and negative results (falsified hypotheses). Crucially, we prove the exact binary framing of level entity records (12-byte records terminated by a `0xFFFFFFFF` sentinel across 189/189 non-empty stages), correct a 16× fixed-point scaling error in prior literature by establishing the engine's native 20.12 fixed-point arithmetic ($0x1000 = 1.0\text{ px}$), map 342 actor profile IDs to their C++ execution classes, and detail emulator bridge telemetry constraints in DeSmuME. Finally, we document the unresolved reverse-engineering gaps, specifically the missing player-specific jump state machine in static disassembly and the unmapped level-clear RAM flag.
+This report documents the reverse engineering of the Nintendo DS title *New Super Mario Bros.* (EUR release NTR-A2DP-EUR) to support physics-informed world models, offline dataset generation, and direct RAM-telemetry reinforcement learning. We report both verified structural truths and negative results (falsified hypotheses). Crucially, we prove the exact binary framing of level entity records (12-byte records terminated by a `0xFFFFFFFF` sentinel across 189/189 non-empty stages), correct a 16× fixed-point scaling error in prior literature by establishing the engine's native 20.12 fixed-point arithmetic ($0x1000 = 1.0\text{ px}$), map 342 actor profile IDs to their C++ execution classes, detail emulator bridge telemetry constraints in DeSmuME, and identify the exact level-clear stage flag at `0x020DCF27`. Finally, we document remaining reverse-engineering gaps, specifically the missing player-specific jump state machine in static disassembly.
 
 ---
 
@@ -138,6 +138,7 @@ By scraping profile declarations `ActorProfile X_Profile = { Class::create, <id>
 | Mario Vertical Position ($Y$) | `0x021C1890 + 0x60` | `s32` | 20.12 fixed point; baseline floor is $-480\text{ px}$ |
 | Mario Horizontal Position ($X$) | `0x021C1890 + 0x68` | `s32` | 20.12 fixed point; tracks screen traversal |
 | Entity Linked List Node | `0x021C1890 + 0x38` | Pointer | Circular doubly-linked list (`[prev: u32, next: u32]`) |
+| Stage Clear Flag | `0x020DCF27` | `u8` | Transitions from 0 to 1 upon flagpole descent / castle entry; verified via differential RAM search |
 
 ### 5.2 Dynamic Entity Scanning
 Enemies dynamically insert into the active linked list when within approximately 20 steps of the camera viewport. The environment reader traverses the memory span `0x021C0000`–`0x021E0000`, walks the active nodes, and extracts the 3 closest entities relative to Mario:
@@ -167,7 +168,6 @@ Documenting negative results is essential to prevent future research cycles from
 
 1. **Player Jump State Machine (Route A Blocked, Route B Incomplete):**
    - The player actor (`PlayerBase`) does not use the default `Actor::accelV` field. Player gravity, jump apex hold, and running jump multipliers reside in an undecompiled state machine. Route B empirical measurement via `bridge/capture_jump.py` must be completed to establish exact coefficients.
-2. **Level-Clear Flagpole RAM Signal (`CLEAR_FLAG_ADDR` Missing):**
-   - No RAM bit has been isolated that transitions upon touching the flagpole. Currently, episodes terminate only on death or 1,000-step truncation, depriving RL agents of terminal success rewards.
-3. **Chunk Terrain Collision Decoding (`BG_chk`):**
+2. **Chunk Terrain Collision Decoding (`BG_chk`):**
    - While `_bgdat.bin` provides bounding boxes for flat ground, composite tiles (slopes, pipes, question blocks) reference indices into `BG_chk/*MainUnitChangeData.bin` which remain undecoded.
+

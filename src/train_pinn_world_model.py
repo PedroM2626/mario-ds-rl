@@ -203,6 +203,7 @@ def main():
     ap.add_argument("--hid", type=int, default=128)
     ap.add_argument("--sample-efficiency", action="store_true",
                     help="also train on N=200,500,1000,2000 and report test MSE")
+    ap.add_argument("--pool-in", default=None, help="load existing pool npz instead of collecting")
     ap.add_argument("--out", default="models/pinn_nsmb.pt")
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
@@ -212,12 +213,18 @@ def main():
     print(f"[pinn-wm] device={device}")
 
     t0 = time.time()
-    env = MarioRamEnv(rom_path=args.rom, state_path=args.state, geo=True)
-    data = collect(env, args.transitions, seed=args.seed)
-    collect_time = time.time() - t0
-    env.close()
-    print(f"[pinn-wm] collected {len(data[0])} real transitions in {collect_time:.1f}s "
-          f"({len(data[0])/collect_time:.0f} steps/s)")
+    if args.pool_in and os.path.exists(args.pool_in):
+        p = np.load(args.pool_in)
+        data = (p["S"], p["A"], p["S2"], p["R"], p["D"], p["EP"])
+        collect_time = 0.0
+        print(f"[pinn-wm] loaded {len(data[0])} transitions from {args.pool_in}")
+    else:
+        env = MarioRamEnv(rom_path=args.rom, state_path=args.state, geo=True)
+        data = collect(env, args.transitions, seed=args.seed)
+        collect_time = time.time() - t0
+        env.close()
+        print(f"[pinn-wm] collected {len(data[0])} real transitions in {collect_time:.1f}s "
+              f"({len(data[0])/collect_time:.0f} steps/s)")
 
     splits = split_temporal(data)
     print(f"[pinn-wm] train/val/test = {len(splits[0][0])}/{len(splits[1][0])}/{len(splits[2][0])}")

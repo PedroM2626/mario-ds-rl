@@ -23,7 +23,7 @@ The pipeline goes from raw DS emulator → RAM telemetry → physics-informed wo
 | 17-dim RAM observation vector | ✅ | `[x, y, vx, vy, on_ground, lives, time, cam_x, 3×(edx,edy,etype)]` |
 | 8-action space with dash | ✅ | Reverse-engineered: X/Y = dash; running jump ≈ 120 px clears wide pits |
 | Reward: progress×2 − 0.05/step, death −15, clear +100 | ✅ | Terminal +100 reward on flagpole contact |
-| Level-finish detection | ✅ | Flagpole X coordinate (`flag_x_px = 4032.0`) in `course.py` + `cleared` check in `ram_env.py` |
+| Level-finish detection | ✅ | Hardware RAM flag isolated at `CLEAR_FLAG_ADDR = 0x020DCF27` (Area/Camera controller) + flagpole coordinate (`4032.0 px`) |
 | Dynamic enemy velocities | ✅ | Finite-difference `(vx, vy)` tracked in `RamState.enemies()` |
 | Absolute screen-pixel X | ⚠️ Partial | Two consistent bases (`0x021C1828` vs object B); **delta is correct** (reward works), but absolute X is ±40 px ambiguous |
 
@@ -97,25 +97,25 @@ Listed in priority order for advancing the ML goal (clearing 1-1 or reaching a p
 
 | Gap | Impact | Suggested Fix |
 |-----|--------|---------------|
-| **Level-finish detection** (no RAM address for flag-pole) | Agents cannot get the +100 reward for clearing; reward signal is truncated | Differential RAM search: record state before/after reaching flag tile manually; or scan `0x021C0000`–`0x021E0000` for a flag/clear flag that changes on goal |
+| **Level-finish detection** | Agents cannot get the +100 reward for clearing; reward signal is truncated | ✅ Solved: Hardware flag isolated at `CLEAR_FLAG_ADDR = 0x020DCF27` via differential RAM search |
 | **Absolute X ambiguity ±40 px** | Progress reward is correct (delta), but absolute position reporting in evals is off | Fix: anchor `B_OFFSET` once; compare `0x021C1828` spawn value with known entrance coordinate |
-| **PPO policy collapses at ~336 px** | First Goomba on flat ground always kills the PPO agent (87 identical steps across 7/8 episodes → deterministic death loop) | The policy is not seeing enemy proximity correctly, OR the trained imagination envs didn't include this enemy configuration. Needs: (a) verify `etype` encoding in obs matches training; (b) add targeted curriculum in imagination |
+| **PPO policy collapses at ~336 px** | First Goomba on flat ground always kills the PPO agent (87 identical steps across 7/8 episodes → deterministic death loop) | Grounded contact mortality added to imagination + $25\times$ death loss weight in PINN |
 
 ### P1 — World model quality
 
 | Gap | Impact | Suggested Fix |
 |-----|--------|---------------|
 | **Open-loop drift 1738 px over 44 frames** | MPC re-plans every step (mitigates this), but PPO relies on long imagined rollouts where the model is inaccurate | Increase transitions to 10k (currently 3500); add recurrent state in the PINN trunk (GRU head); or use an ensemble of 3 PINNs and take pessimistic lower bound |
-| **Enemy dynamics unmodeled beyond relative position** | Enemies move; their relative position changes in ways the PINN doesn't capture well (logvar head marks this as high-uncertainty) | Add enemy velocity as an explicit state component (5 → 5+6=11 enemy features); derive from consecutive RAM reads |
-| **No contact/death prediction** | The PINN `continue` head is a binary; it doesn't distinguish death-by-enemy from death-by-pit | Separate heads: pit_death (from tile map, deterministic) + enemy_death (from proximity + type) |
+| **Enemy dynamics unmodeled beyond relative position** | Enemies move; their relative position changes in ways the PINN doesn't capture well (logvar head marks this as high-uncertainty) | ✅ Solved: Dynamic enemy velocities `(vx, vy)` tracked in `RamState.enemies()` |
+| **No contact/death prediction** | The PINN `continue` head is a binary; it doesn't distinguish death-by-enemy from death-by-pit | ✅ Solved: Explicit physical collision hitbox check in `PINNImaginationEnv` |
 
 ### P2 — Planning gaps
 
 | Gap | Impact | Suggested Fix |
 |-----|--------|---------------|
-| **Enemy-unaware A\* planner** | MPC consistently dies at ~1730 px where a Goomba blocks the approach to a pit edge | Extend `TilemapAStar` to treat enemy spawn columns as soft obstacles; or time the approach around enemy patrol cycle |
+| **Enemy-unaware A\* planner** | MPC consistently dies at ~1730 px where a Goomba blocks the approach to a pit edge | ✅ Solved: `enemy_threat_ahead` added to `TilemapAStar` |
 | **Multi-level generalization** | Planner and RAM addresses only validated on 1-1 | Run `course.py` batch export on all 382 levels → JSON; verify calibration on 1-2 and 2-1 |
-| **JUMP_REACH_PX hardcoded** | 120 px works for most pits in 1-1 but breaks on wider pits in later worlds | Derive from physics: `JUMP_REACH_PX = 2 * vx_dash * t_airborne` where `t_airborne` comes from the PINN; update dynamically |
+| **JUMP_REACH_PX hardcoded** | 120 px works for most pits in 1-1 but breaks on wider pits in later worlds | ✅ Solved: Dynamic reach $X_{\text{reach}}(v_x) = v_x \cdot t_{\text{air}}$ ($t_{\text{air}} = 48\text{ frames}$) |
 
 ### P3 — Documentation & reproducibility
 
@@ -123,8 +123,8 @@ Listed in priority order for advancing the ML goal (clearing 1-1 or reaching a p
 |-----|--------|---------------|
 | **No formal `docs/` entry for RAM reverse engineering** | The discovery methodology lives only in `ram_state.py` | ✅ Solved: Documented in [`docs/REVERSE_ENGINEERING_REPORT.md`](REVERSE_ENGINEERING_REPORT.md) |
 | **Complete Gap Analysis & Roadmap** | Gaps across all pillars not centralized | ✅ Solved: Documented in [`docs/COMPREHENSIVE_GAP_ANALYSIS_AND_ROADMAP.md`](COMPREHENSIVE_GAP_ANALYSIS_AND_ROADMAP.md) |
-| **`evals/benchmark_n30_merged.json` not described** | The eval protocol (n=30, seeds, det/stoch split) is in the JSON but not in any doc | Add `docs/BENCHMARK_PROTOCOL.md` |
-| **No trained model cards** | Each `.zip`/`.pt` in `models/` has no metadata doc | Generate `docs/MODEL_CARDS.md` with hyperparams, training time, eval metrics for each model |
+| **`evals/benchmark_n30_merged.json` not described** | The eval protocol (n=30, seeds, det/stoch split) is in the JSON but not in any doc | ✅ Solved: Documented in [`docs/BENCHMARK_PROTOCOL.md`](BENCHMARK_PROTOCOL.md) |
+| **No trained model cards** | Each `.zip`/`.pt` in `models/` has no metadata doc | ✅ Solved: Documented in [`docs/MODEL_CARDS.md`](MODEL_CARDS.md) |
 | **README §14 (PINN) not linked to WORLD_MODEL_PINN.md** | The detailed doc exists but README only has a CLI snippet | Add link in README |
 
 ---
