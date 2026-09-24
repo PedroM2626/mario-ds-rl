@@ -88,13 +88,14 @@ class Course:
             self.rects.append({"obj": obj, "tx": x, "ty": y, "w": w, "h": h})
             i += 10
 
-        # ground coverage per column (tiles)
+        # ground coverage per column (tiles) - filter yy >= 18 to exclude sky/ceiling markers at row 0
         cover = {}
         for r in self.rects:
             if r["obj"] in GROUND_OBJS:
                 for xx in range(r["tx"], r["tx"] + r["w"]):
                     for yy in range(r["ty"], r["ty"] + r["h"]):
-                        cover.setdefault(xx, set()).add(yy)
+                        if yy >= 18:
+                            cover.setdefault(xx, set()).add(yy)
         self.ground_cover = cover
 
         # flag / level finish detection: sprite 32 or highest X goal object

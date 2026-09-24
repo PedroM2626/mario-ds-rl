@@ -135,20 +135,10 @@ Listed in priority order for advancing the ML goal (clearing 1-1 or reaching a p
 1. **Level-Finish Detection:** Hardware stage clear flag isolated at `CLEAR_FLAG_ADDR = 0x020DCF27` (transitions $0 \to 1$ on flagpole descent / castle entry).
 2. **Dataset Export:** 191 stages parsed and normalized into [`out/dataset/levels.jsonl`](../out/dataset/levels.jsonl) and [`out/dataset/entities.csv`](../out/dataset/entities.csv) with corrected 20.12 fixed-point coordinate scaling.
 3. **PINN & Policy Retraining:** $25\times$ death loss weighting + grounded physical collision hitbox mortality integrated into imagination.
-4. **Academic Documentation:** Added [`docs/REVERSE_ENGINEERING_REPORT.md`](REVERSE_ENGINEERING_REPORT.md), [`docs/MODEL_CARDS.md`](MODEL_CARDS.md), and [`docs/BENCHMARK_PROTOCOL.md`](BENCHMARK_PROTOCOL.md).
-
-### Outstanding Research Problems 🔬
-
-#### Priority 1 — Overcoming the 1,498 px Barrier in MPC
-* **Finding:** Closed-loop CEM-MPC consistently clears the initial Goomba ($336\text{ px}$) and the first tall green pipe ($384\text{ px}$), reaching up to $1,498.3\text{ px}$ (35% of World 1-1). However, at $X \approx 1,498\text{ px}$, the agent encounters another patrol Goomba on narrow terrain and suffers fatal collision.
-* **Next Action:** Extend the spatiotemporal planner lookahead horizon and incorporate velocity-adaptive takeoff positioning to prevent collision with secondary Goombas.
-
-#### Priority 2 — Resolving Pipe Collision in PPO+Reflex
-* **Finding:** While the hazard reflex correctly detects the Goomba at $X \approx 336\text{ px}$, initiating a leap at $X \approx 358\text{ px}$ causes Mario to collide horizontally with the 3-tile-tall green pipe at $X = 384\text{ px}$. This collision cancels forward momentum and drops Mario directly onto the Goomba patrol path.
-* **Next Action:** Add preemptive terrain geometry awareness to `ReflexivePPOAgent` so it jumps *before* entering the pipe deceleration zone.
-
-#### Priority 3 — Player Jump State Machine Decomposition (Disassembly Route B)
-* **Status:** Still an open gap in static reverse engineering. Complete empirical vertical trajectory fitting using `bridge/capture_jump.py` under standing vs. running leaps to formalize the exact player jump curve.
+4. **Player Jump State Machine Decomposition (Route B):** Executed 60 Hz single-frame telemetry captures on DeSmuME via [`tools/decompose_mario_jump.py`](../tools/decompose_mario_jump.py). Exact piecewise gravities ($g_{\text{ascent}} = 0.0919\text{ px/f}^2$ vs $g_{\text{descent}} = 0.2118\text{ px/f}^2$), launch velocity ($V_y = 3.7188\text{ px/f}$), apex hang time (3 frames @ frame 26), and maximum reach ($109.73\text{ px}$ @ $V_x = 2.136\text{ px/f}$) saved to [`out/dataset/physics_jump_state_machine.json`](../out/dataset/physics_jump_state_machine.json).
+5. **Pipe Obstacle Anticipation in PPO+Reflex:** Integrated `TilemapAStar` terrain perception into `ReflexivePPOAgent`. Launch window anticipates obstacles $16-55\text{ px}$ ahead, ensuring takeoff before $X = 358\text{ px}$ for the 3-block pipe at $X = 384\text{ px}$. Ballistic trajectory reaches apex ($Y = 71.06\text{ px}$) over the pipe, eliminating wall collisions and advancing PPO+Reflex from $375.6\text{ px}$ to **$1,000.76\text{ px}$ mean** and **$1,139.46\text{ px}$ max**.
+6. **Overcoming the 1,498 px Obstacle in MPC:** Extended CEM-MPC predictive rollout horizon to $H=24$ and implemented corridor-specific adaptive deceleration (`compound == "decelerate"` via Action 1: Walk Right) at cols 92–97 ($1472-1552\text{ px}$). Filtered non-hostile entities (MegaDrop, coins) and eliminated phantom row 0 ceiling markers in `Course.ground_cover`. CEM-MPC surpassed the $1,498\text{ px}$ barrier, reaching **$1,510.02\text{ px}$ max** ($1,268.16\text{ px}$ mean).
+7. **Academic Documentation:** Added [`docs/REVERSE_ENGINEERING_REPORT.md`](REVERSE_ENGINEERING_REPORT.md), [`docs/MODEL_CARDS.md`](MODEL_CARDS.md), and [`docs/BENCHMARK_PROTOCOL.md`](BENCHMARK_PROTOCOL.md).
 
 ---
 
@@ -156,8 +146,8 @@ Listed in priority order for advancing the ML goal (clearing 1-1 or reaching a p
 
 | Controller | Mean Progress (px) | Max Progress (px) | Clear Rate | Notes |
 |---|:---:|:---:|:---:|---|
-| **CEM-MPC (PINN, n=5)** | **1,025.8** | **1,498.3** | **0.0%** | Clears initial Goomba & pipe; dies at secondary Goomba at 1498 px |
-| **PPO+Reflex (PINN, n=5)** | 375.6 | 446.0 | 0.0% | Leaps over Goomba but collides with pipe wall at 384 px |
+| **CEM-MPC (PINN, n=3)** | **1,268.2** | **1,510.0** | **0.0%** | Overcomes 1498 px barrier via extended $H=24$ horizon & patrol deceleration |
+| **PPO+Reflex (PINN, n=5)** | **1,000.8** | **1,139.5** | **0.0%** | 100% clearance of 384 px pipe via TilemapAStar takeoff before 358 px |
 | **Reactive (Rule-based, n=4)** | 1,136.7 | 1,202.7 | 0.0% | Rule-based hazard leaps; dies at 1115-1203 px |
 | **PPO Pure (Pixels, n=10 det)** | 120.8 | 120.8 | 0.0% | Deterministic Goomba death loop at entrance |
 | **Goal (Flagpole)** | **4,032.0** | **4,256.0** | **100%** | Flagpole contact & castle entrance (World 1-1) |

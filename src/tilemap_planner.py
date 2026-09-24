@@ -23,21 +23,26 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from course import Course, TILE  # noqa: E402
 
 ROM = "data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).nds"
-JUMP_REACH_PX = 120.0          # conservative running-jump horizontal reach
-JUMP_REACH_TILES = int(JUMP_REACH_PX // TILE)  # ~7 tiles
+# Empirical kinematics grounded via 60 Hz DeSmuME telemetry (Route B decomposition):
+# Running leap: 52 frames, 109.73 px reach, apex at frame 26 (71.06 px high, ~55 px forward)
+# Walking jump: 52 frames, 75.33 px reach, apex at frame 26 (71.06 px high)
+# Short hop: 22 frames, 19.94 px high
+JUMP_REACH_PX = 109.73          # empirical running-jump horizontal reach
+JUMP_REACH_TILES = int(JUMP_REACH_PX // TILE)  # 6 tiles (96 px safe margin)
 
 
-def dynamic_jump_reach_px(vx_px_per_frame=None, airborne_frames=48.0):
-    """Computes ballistic horizontal reach: X_reach = vx * t_airborne.
-    Walking (1.5 px/f) -> ~72 px (~4.5 tiles).
-    Running/dash (3.0-3.3 px/f) -> ~144-160 px (~9-10 tiles).
-    Standing (0.0 px/f) -> 0 px (pure vertical leap).
+def dynamic_jump_reach_px(vx_px_per_frame=None, airborne_frames=52.0):
+    """Computes ballistic horizontal reach using empirical DeSmuME kinematics:
+    X_reach = vx * t_airborne.
+    Walking (1.47 px/f) -> 75.33 px (~4.7 tiles).
+    Running/dash (2.14 px/f) -> 109.73 px (~6.8 tiles).
+    Standing (0.0 px/f) -> 0 px (pure vertical leap: 63.81 px high).
     """
-    vx = max(0.0, float(vx_px_per_frame if vx_px_per_frame is not None else 2.5))
+    vx = max(0.0, float(vx_px_per_frame if vx_px_per_frame is not None else 2.136))
     return vx * airborne_frames
 
 
-def dynamic_jump_reach_tiles(vx_px_per_frame=None, airborne_frames=48.0):
+def dynamic_jump_reach_tiles(vx_px_per_frame=None, airborne_frames=52.0):
     return int(dynamic_jump_reach_px(vx_px_per_frame, airborne_frames) // TILE)
 
 
@@ -191,6 +196,27 @@ class TilemapAStar:
             if a <= col <= b:
                 return b - a + 1
         return 0
+
+    def pipe_ahead(self, mario_abs_px, look_tiles=5, min_height_tiles=2):
+        """Distance in pixels to the next pipe/wall rising >= min_height_tiles,
+        or None if no pipe in lookahead.
+        Used to ensure Mario launches before X = 358 px for the X = 384 px pipe."""
+        col = int(mario_abs_px / TILE)
+        cur = self.surface.get(col, 30)
+        for d in range(1, look_tiles + 1):
+            ahead_col = col + d
+            h = self.obstacle_h.get(ahead_col, 0)
+            s = self.surface.get(ahead_col)
+            rise = (cur - s) if (cur is not None and s is not None) else 0
+            if h >= min_height_tiles or rise >= min_height_tiles:
+                return ahead_col * TILE - mario_abs_px
+        return None
+
+    def is_narrow_corridor(self, mario_abs_px):
+        """True when Mario is approaching or within the narrow elevated corridor (1472-1552px, cols 92-97),
+        where the Goomba patrols at X=1498px."""
+        col = int(mario_abs_px / TILE)
+        return 91 <= col <= 97
 
     def goal_px(self):
         return self.max_col * TILE

@@ -1,0 +1,62 @@
+{
+  "Standing Tap Jump (2 frames)": {
+    "name": "Standing Tap Jump (2 frames)",
+    "airborne": true,
+    "t_takeoff_frame": 1,
+    "t_land_frame": 22,
+    "air_duration_frames": 22,
+    "max_height_px": 19.94,
+    "vy_launch_px_per_frame": 3.5938,
+    "gravity_ascent_px_per_f2": 0.3284,
+    "gravity_descent_px_per_f2": 0.2662,
+    "vy_terminal_px_per_frame": -2.6875,
+    "apex_hang_frames": 3,
+    "vx_mean_px_per_frame": 0.0,
+    "horizontal_reach_px": 0.0
+  },
+  "Standing Full Jump (Hold B)": {
+    "name": "Standing Full Jump (Hold B)",
+    "airborne": true,
+    "t_takeoff_frame": 1,
+    "t_land_frame": 48,
+    "air_duration_frames": 48,
+    "max_height_px": 63.81,
+    "vy_launch_px_per_frame": 3.5938,
+    "gravity_ascent_px_per_f2": 0.0963,
+    "gravity_descent_px_per_f2": 0.2339,
+    "vy_terminal_px_per_frame": -4.0,
+    "apex_hang_frames": 3,
+    "vx_mean_px_per_frame": 0.0,
+    "horizontal_reach_px": 0.0
+  },
+  "Walking Held Jump (Right + B)": {
+    "name": "Walking Held Jump (Right + B)",
+    "airborne": true,
+    "t_takeoff_frame": 1,
+    "t_land_frame": 52,
+    "air_duration_frames": 52,
+    "max_height_px": 71.06,
+    "vy_launch_px_per_frame": 3.7188,
+    "gravity_ascent_px_per_f2": 0.0919,
+    "gravity_descent_px_per_f2": 0.2118,
+    "vy_terminal_px_per_frame": -4.0,
+    "apex_hang_frames": 3,
+    "vx_mean_px_per_frame": 1.4716,
+    "horizontal_reach_px": 75.33
+  },
+  "Running Held Leap (Right + Y + B)": {
+    "name": "Running Held Leap (Right + Y + B)",
+    "airborne": true,
+    "t_takeoff_frame": 1,
+    "t_land_frame": 52,
+    "air_duration_frames": 52,
+    "max_height_px": 71.06,
+    "vy_launch_px_per_frame": 3.7188,
+    "gravity_ascent_px_per_f2": 0.0919,
+    "gravity_descent_px_per_f2": 0.2118,
+    "vy_terminal_px_per_frame": -4.0,
+    "apex_hang_frames": 3,
+    "vx_mean_px_per_frame": 2.136,
+    "horizontal_reach_px": 109.73
+  }
+}
