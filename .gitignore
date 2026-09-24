@@ -16,6 +16,8 @@ models/*sanity*
 
 # Generated logs and run listings (reproducible; official results are stored in evals/*.json)
 *.log
+logs_*.txt
+*.bin
 ram_search.npz
 eval_results.txt
 eval_run.log

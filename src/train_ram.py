@@ -51,11 +51,14 @@ def main():
                     default="data/0479 - New Super Mario Bros. (Europe) (En,Fr,De,Es,It).ds1", help="Path to savestate")
     ap.add_argument("--geo", action="store_true",
                     help="Append 6 ROM pit flags to observations (obs 17 -> 23)")
+    ap.add_argument("--checkpoint-every", type=int, default=50000,
+                    help="Save a checkpoint every N env steps (0 disables)")
     args = ap.parse_args()
 
     import mlflow
     from stable_baselines3 import PPO
     from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+    from stable_baselines3.common.callbacks import CheckpointCallback
 
     mlflow.set_tracking_uri("sqlite:///mlflow.db")
     mlflow.set_experiment("Mario_NDS_RL")
@@ -75,7 +78,14 @@ def main():
             model.learn(total_timesteps=args.timesteps, reset_num_timesteps=False)
         else:
             model = PPO("MlpPolicy", env, verbose=1, tensorboard_log=None)
-            model.learn(total_timesteps=args.timesteps)
+            cbs = []
+            if args.checkpoint_every > 0:
+                os.makedirs("models/checkpoints", exist_ok=True)
+                # save_freq is counted per env call, so divide by the number of envs
+                cbs.append(CheckpointCallback(save_freq=max(1, args.checkpoint_every // args.num_envs),
+                                              save_path="./models/checkpoints/",
+                                              name_prefix=args.run_id, save_replay_buffer=False))
+            model.learn(total_timesteps=args.timesteps, callback=cbs or None)
         os.makedirs("models", exist_ok=True)
         model.save(f"models/{args.run_id}")
         mlflow.log_artifact(f"models/{args.run_id}.zip")

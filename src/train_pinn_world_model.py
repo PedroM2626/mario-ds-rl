@@ -128,7 +128,8 @@ def train_model(data, model, device, epochs, lr=1e-3, wd=1e-5, bs=64, verbose=Tr
             nll = 0.5 * torch.exp(-logvar) * err + 0.5 * logvar
             loss_dyn = (nll * dim_w).mean()
             loss_rew = F.mse_loss(r, Rt[idx])
-            loss_cont = F.binary_cross_entropy_with_logits(lc, 1.0 - Dt[idx])
+            w_cont = torch.where(Dt[idx] > 0.5, torch.full_like(Dt[idx], 25.0), torch.ones_like(Dt[idx]))
+            loss_cont = F.binary_cross_entropy_with_logits(lc, 1.0 - Dt[idx], weight=w_cont)
             loss = loss_dyn + loss_rew + 0.5 * loss_cont
             opt.zero_grad(); loss.backward(); opt.step()
             tot += loss.item() * len(idx)

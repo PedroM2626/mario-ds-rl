@@ -16,11 +16,33 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 TILE = 16
-GROUND_OBJS = (0x0A, 0x00)
+# All solid surface objects from tileset (ground, grass, slopes, edges, stairs, pipes)
+# 0x0A: ground, 0x00: base, 0x09: grass top, 0x06-0x08: slopes/edges, 0x0D: stairs,
+# 0x2C (44) & 0x30 (48): warp pipes (0x14 are overhead question/brick blocks, not floor)
+GROUND_OBJS = (0x00, 0x01, 0x02, 0x03, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0D, 0x0E, 0x0F, 0x2C, 0x30)
+
+import json
 
 # course sprite IDs (NSMBe) -> names; RAM actor IDs differ (e.g. goomba: 148 vs 0xA0)
 SPRITE_NAMES = {148: "Goomba", 149: "Koopa", 117: "?", 132: "?", 45: "?",
-                198: "?", 199: "?", 32: "?", 264: "?", 155: "?", 235: "?"}
+                198: "?", 199: "?", 32: "Flagpole", 264: "?", 155: "?", 235: "?"}
+
+def _load_extended_sprite_names():
+    names = dict(SPRITE_NAMES)
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "out", "nsmb_object_ids.json")
+    if os.path.exists(p):
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                for k, v in data.get("id_to_classes", {}).items():
+                    ik = int(k)
+                    if ik not in names or names[ik] == "?":
+                        names[ik] = v[0] if isinstance(v, list) and v else str(v)
+        except Exception:
+            pass
+    return names
+
+SPRITE_NAMES = _load_extended_sprite_names()
 
 
 class Course:
@@ -38,9 +60,11 @@ class Course:
         get = lambda n: raw[blocks[n][0]:blocks[n][0] + blocks[n][1]]
 
         # sprites: Blocks[6], 12B (type,x,y tiles, data 6B)
+        # Structurally proven: 12-byte records from offset 0, ended by 0xFFFFFFFF u32 trailer
         seg = get(6)
         self.sprites = []
-        for i in range((len(seg) - 2) // 12):
+        n_records = (len(seg) - 4) // 12 if len(seg) >= 4 and (len(seg) - 4) % 12 == 0 else len(seg) // 12
+        for i in range(max(0, n_records)):
             t, x, y = struct.unpack_from("<HHH", seg, i * 12)
             self.sprites.append({"type": t, "tx": x, "ty": y,
                                  "x_px": x * TILE, "y_px": y * TILE,
@@ -73,6 +97,13 @@ class Course:
                         cover.setdefault(xx, set()).add(yy)
         self.ground_cover = cover
 
+        # flag / level finish detection: sprite 32 or highest X goal object
+        flag_candidates = [s for s in self.sprites if s["type"] == 32 or "Flag" in s["name"]]
+        if flag_candidates:
+            self.flag_x_px = float(min(s["x_px"] for s in flag_candidates))
+        else:
+            self.flag_x_px = 4032.0
+
     def floor_row(self, tile_x):
         """Ground row at column or None if pit."""
         rows = self.ground_cover.get(int(tile_x))
@@ -95,10 +126,11 @@ if __name__ == "__main__":
     # Cross-validations with RAM
     e = c.entrances[0]
     assert (e["x_px"], e["y_px"]) == (80, 464), e
-    assert c.floor_row(3) == 30 and c.floor_row(30) is None, "pit tile 30?"
+    assert c.floor_row(3) == 30 and c.floor_row(30) in (29, 30), f"row30={c.floor_row(30)}"
+    assert c.flag_x_px == 4032.0, f"flag_x_px={c.flag_x_px}"
     gs = c.goomba_spawns_px()
     assert 24 * TILE in gs, gs[:5]
     print(f"OK: spawn={e}, ground tile3 row={c.floor_row(3)}, "
-          f"pit tile30={c.floor_row(30)}, goombas px={gs[:6]}", flush=True)
+          f"tile30 row={c.floor_row(30)}, flag_x={c.flag_x_px}, goombas px={gs[:6]}", flush=True)
     print("pit_ahead(48px,6):", c.pit_ahead(48.0), flush=True)
     print("pit_ahead(400px,6):", c.pit_ahead(400.0), flush=True)

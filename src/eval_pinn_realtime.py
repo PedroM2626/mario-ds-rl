@@ -246,6 +246,45 @@ class PPOAgent:
         pass
 
 
+class ReflexivePPOAgent(PPOAgent):
+    """Hybrid PPO + safety reflex to prevent deterministic deaths at flat-ground enemies."""
+    name = "ppo+reflex"
+
+    def __init__(self, policy_path, device, planner=None,
+                 enemy_lo=8.0, enemy_hi=46.0, enemy_dy=50.0):
+        super().__init__(policy_path, device)
+        self.planner = planner
+        self.enemy_lo, self.enemy_hi, self.enemy_dy = enemy_lo, enemy_hi, enemy_dy
+        self.clearing = False
+
+    def act(self, obs):
+        on_ground = obs[4] > 0.5
+        vy = obs[3]
+        if self.clearing:
+            if not on_ground:
+                return 3  # Maintain right + dash speed during jump
+            self.clearing = False
+
+        if on_ground and vy > -0.05:
+            # Check dynamic enemy proximity: preemptive running leap over Goombas
+            for k in range(3):
+                dx = obs[8 + 3 * k] * 256.0
+                dy = obs[9 + 3 * k] * 256.0
+                et = obs[10 + 3 * k] * 256.0
+                if et > 1.0 and self.enemy_lo < dx < self.enemy_hi and abs(dy) < self.enemy_dy:
+                    self.clearing = True
+                    return 4  # Action 4: right + dash + jump (running leap)
+            # Check pit hazard ahead
+            if any(obs[17 + c] < 0.5 for c in range(2)):
+                self.clearing = True
+                return 4
+
+        return super().act(obs)
+
+    def reset(self):
+        self.clearing = False
+
+
 def grab_top_screen(emu):
     buf = np.array(emu.display_buffer_as_rgbx(), dtype=np.uint8).reshape(384, 256, 4)
     return buf[:192, :, :3][:, :, ::-1].copy()  # top screen, BGR
@@ -314,7 +353,7 @@ def run_episode(env, agent, goal, render, speed, max_steps, verbose, writer=None
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--controller", choices=["mpc", "ppo", "reactive"], default="mpc")
+    ap.add_argument("--controller", choices=["mpc", "ppo", "ppo+reflex", "reactive"], default="mpc")
     ap.add_argument("--model", default="models/pinn_nsmb.pt")
     ap.add_argument("--policy", default="models/pinn_policy.zip")
     ap.add_argument("--rom", default=ROM); ap.add_argument("--state", default=STATE)
@@ -369,6 +408,10 @@ def main():
             enemy_lo=args.enemy_lo, enemy_hi=args.enemy_hi, enemy_dy=args.enemy_dy,
             pit_lookahead=args.pit_lookahead, pit_enemy_suppress=args.pit_enemy_suppress,
             planner=planner, enabled=not args.no_reflex)
+    elif args.controller == "ppo+reflex":
+        make_agent = lambda: ReflexivePPOAgent(
+            args.policy, device, planner=planner,
+            enemy_lo=args.enemy_lo, enemy_hi=args.enemy_hi, enemy_dy=args.enemy_dy)
     else:
         make_agent = lambda: PPOAgent(args.policy, device)
 

@@ -49,13 +49,13 @@ def main():
     ap.add_argument("--out", default="models/pinn_policy.zip")
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--w-progress", type=float, default=3.0)
-    ap.add_argument("--w-enemy", type=float, default=1.0)
-    ap.add_argument("--w-pit", type=float, default=1.0)
+    ap.add_argument("--w-enemy", type=float, default=5.0, help="Weight on enemy avoidance penalty")
+    ap.add_argument("--w-pit", type=float, default=2.5, help="Weight on pit avoidance penalty")
     args = ap.parse_args()
 
     device = args.device
     model = load_world_model(args.model, device)
-    cfg = ShapingConfig(progress=args.w_progress, enemy=args.w_enemy, pit=args.w_pit)
+    cfg = ShapingConfig(progress=args.w_progress, enemy=args.w_enemy, pit=args.w_pit, enemy_x_sigma=64.0)
     pool = np.load(args.pool)
     # seed states: use real observed states (skip degenerate zeros)
     states = pool["S"]

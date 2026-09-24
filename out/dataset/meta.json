@@ -1,0 +1,27 @@
+{
+ "schema_version": 1,
+ "levels": 191,
+ "entities": 5311,
+ "units": {
+  "position_and_velocity_fixed_point": "0x1000 == 1 pixel (12 fractional bits)",
+  "evidence": [
+   "src/AAA.hpp:17  _FixedFlt(flt) ((i32)(flt * 4096.0))",
+   "src/AAA.hpp:19-23  _FixedMul shifts by 12",
+   "src/Bases/StageEntity.cpp:100-101  viewOffset.x << 0xc  (pixels -> world units)",
+   "src/Bases/Coin.cpp:650 sets viewOffset.y = 8 while :705 offsets the sprite by 0x8000 (8 px == 0x8000)",
+   "src/Bases/Coin.cpp:517-518 shifts by 0x8000 (half tile) and 0x10000 (tile) => 1 tile = 16 px = 0x10000"
+  ],
+  "note": "An earlier revision of this project used 16.16 (0x10000 per pixel). That was wrong by 16x and is corrected here.",
+  "tile_px": 16,
+  "fps": 60,
+  "accel_sign": "positive velocity.y is UP (src/Bases/manhole.cpp:370-377 tests player.velocity.y > 0 to mean jumping), so gravity is negative and minVelocity.y is the floor."
+ },
+ "id_column": "col0 of the 12-byte record; framing proven by the 0xFFFFFFFF terminator u32 in 189/189 non-empty levels",
+ "coordinates": "x_px/y_px are record words 1 and 2 times 16 (tiles -> pixels); z/settings words 3..5 are raw",
+ "readme": "levels.jsonl = one level per line (entities + section inventory); entities.csv = flat table; physics.json = engine constants and the integration model; object_ids.json = 342 object-id -> actor class.",
+ "what_is_not_here": [
+  "the player's own gravity and jump velocity: not present in the decompilation",
+  "terrain tile layout: the level files store chunk references; the chunk library is BG_chk/*MainUnitChangeData.bin and is not decoded yet",
+  "the meaning of words 3..5 of the record (z? generator settings?)"
+ ]
+}

@@ -27,6 +27,20 @@ JUMP_REACH_PX = 120.0          # conservative running-jump horizontal reach
 JUMP_REACH_TILES = int(JUMP_REACH_PX // TILE)  # ~7 tiles
 
 
+def dynamic_jump_reach_px(vx_px_per_frame=None, airborne_frames=48.0):
+    """Computes ballistic horizontal reach: X_reach = vx * t_airborne.
+    Walking (1.5 px/f) -> ~72 px (~4.5 tiles).
+    Running/dash (3.0-3.3 px/f) -> ~144-160 px (~9-10 tiles).
+    Standing (0.0 px/f) -> 0 px (pure vertical leap).
+    """
+    vx = max(0.0, float(vx_px_per_frame if vx_px_per_frame is not None else 2.5))
+    return vx * airborne_frames
+
+
+def dynamic_jump_reach_tiles(vx_px_per_frame=None, airborne_frames=48.0):
+    return int(dynamic_jump_reach_px(vx_px_per_frame, airborne_frames) // TILE)
+
+
 class TilemapAStar:
     def __init__(self, rom_path=ROM, name="course/A01_1.bin", jump_reach_tiles=JUMP_REACH_TILES):
         course = Course(name=name, rom_path=rom_path)
@@ -101,14 +115,47 @@ class TilemapAStar:
                             "landing_col": land, "width": w}
         return best
 
-    def should_jump(self, mario_abs_px):
-        """True when Mario is at a pit takeoff edge (next column is a hole) or, for
-        a wide pit, within one tile of its takeoff -- the A*-prescribed leap.
-
-        Returns (jump: bool, upcoming_pit_width_tiles: int).
+    def enemy_threat_ahead(self, mario_abs_px, enemies=None, lookahead_px=80.0):
+        """Scans real-time enemies for collision threats ahead, especially near takeoff edges.
+        Returns:
+            threat_type: None | 'dash_leap' | 'jump_stomp' | 'retreat_wait'
+            info: dict with threat metrics
         """
+        if not enemies:
+            return None, {}
+        for e in enemies:
+            dx = e.get("dx")
+            dy = e.get("dy", 0.0)
+            if dx is None or dx <= 0.0 or dx > lookahead_px or abs(dy) > 48.0:
+                continue
+            evx = e.get("vx", 0.0)
+            col = int((mario_abs_px + dx) / TILE)
+            # Check if enemy is right at a takeoff boundary
+            is_takeoff = (col in self.takeoffs) or ((col + 1) in self.takeoffs)
+            if is_takeoff:
+                # Goomba blocking pit edge!
+                if dx < 48.0:
+                    return "dash_leap", {"dx": dx, "dy": dy, "col": col, "hazard": "takeoff_blocker"}
+                else:
+                    return "retreat_wait", {"dx": dx, "dy": dy, "col": col, "hazard": "takeoff_blocker"}
+            if dx < 38.0:
+                return "jump_stomp", {"dx": dx, "dy": dy, "col": col, "hazard": "flat_enemy"}
+        return None, {}
+
+    def should_jump(self, mario_abs_px, vx_px_per_frame=None, enemies=None):
+        """True when Mario is at a pit takeoff edge, approaching an enemy, or needs a running leap.
+        Returns (jump: bool, upcoming_pit_width_tiles: int, reason: str).
+        """
+        # 1. Dynamic enemy threat check
+        threat, info = self.enemy_threat_ahead(mario_abs_px, enemies)
+        if threat in ("dash_leap", "jump_stomp"):
+            return True, 0
+        elif threat == "retreat_wait":
+            return False, 0
+
         col = int(mario_abs_px / TILE)
         nxt = col + 1
+        reach_tiles = dynamic_jump_reach_tiles(vx_px_per_frame)
         if nxt not in self.solid:                       # hole immediately ahead
             width = self._gap_width_at(nxt)
             return True, width

@@ -95,6 +95,7 @@ class MarioRamEnv(gym.Env):
         cam = st["acc_cam"] / 4096.0 / 512.0
         obs = [x, y, vx, vy, on_ground, lives, time_left, cam]
         ens = sorted(self.ram.enemies(), key=lambda e: abs(e["dx"] or 1e9))[:N_ENEMIES]
+        self._last_enemies = ens
         for e in ens:
             obs += [e["dx"] / 256.0, e["dy"] / 256.0, e["type"] / 256.0]
         while len(obs) < OBS_DIM:
@@ -147,16 +148,27 @@ class MarioRamEnv(gym.Env):
         obs, st = self._observe()
         reward = st["progress"] / 4096.0 * 2.0 - 0.05
         done, trunc = False, False
+        
+        # Check level completion (RAM flag or flagpole contact)
+        mario_px = (st["mario_B"] / 4096.0) if st["mario_B"] is not None else 0.0
+        flag_x = getattr(self.course, "flag_x_px", 4032.0) if self.course else 4032.0
+        cleared = st.get("cleared", False) or (mario_px >= flag_x - 16.0)
+
         if st["died"]:
             done = True
             reward -= 15.0
+        elif cleared:
+            done = True
+            reward += 100.0  # Terminal reward for clearing the stage
         elif getattr(self, "_last_time", 1.0) <= 0:
             done = True
             reward -= 50.0
         self.episode_steps += 1
         if self.episode_steps >= self.max_steps:
             trunc = True
-        return obs, reward, done, trunc, {"x": float(obs[0])}
+        info = {"x": float(obs[0]), "mario_px": mario_px, "level_cleared": cleared,
+                "enemies": getattr(self, "_last_enemies", [])}
+        return obs, reward, done, trunc, info
 
     def close(self):
         if self.has_emulator:

@@ -25,6 +25,7 @@ ODO_ADDR = 0x0209AE9C
 Y_ADDR = 0x020A703C  # Experimental (flat on ground, increases in freefall)
 VEL_ADDRS = (0x021C1904, 0x021C1928, 0x021C1940, 0x021C1A94, 0x021C1F6C)
 MARIO_BASE = 0x021C1890
+CLEAR_FLAG_ADDR = None  # Level finish flag in RAM (scanned on goal touch)
 OFF_TYPE, OFF_A, OFF_B, OFF_NODE = 0x44, 0x60, 0x68, 0x38
 SCAN_LO, SCAN_HI = 0x021C0000, 0x021E0000
 
@@ -57,6 +58,7 @@ class RamState:
         self.prev_lives = None
         self.deaths = 0
         self.mario_base = None
+        self.prev_enemies = {}  # obj_ptr -> (b, a) for finite-diff velocity tracking
 
     # -- memory access primitives ---------------------------------------
     def _r32(self, addr):
@@ -122,6 +124,7 @@ class RamState:
             return []
         ma, mb = self._mario_pos()
         out = []
+        cur_enemies = {}
         try:
             nodes = self._walk(self.mario_base + OFF_NODE)
         except Exception:
@@ -138,9 +141,20 @@ class RamState:
             dy = (a - ma) / 4096.0 if ma is not None else None
             if dx is None or abs(dx) > max_dx_px or abs(dy or 0) > max_dy_px:
                 continue
+            
+            # Compute dynamic enemy velocity via finite difference (px/frame)
+            prev = self.prev_enemies.get(obj)
+            if prev is not None:
+                vx = (b - prev[0]) / 4096.0
+                vy = (a - prev[1]) / 4096.0
+            else:
+                vx, vy = 0.0, 0.0
+            cur_enemies[obj] = (b, a)
+
             e = {"type": typ, "name": OBJ_TYPES.get(typ, f"0x{typ:04X}"),
-                 "A": a, "B": b, "dx": dx, "dy": dy}
+                 "A": a, "B": b, "dx": dx, "dy": dy, "vx": vx, "vy": vy}
             out.append(e)
+        self.prev_enemies = cur_enemies
         return out
 
     # -- main poll --------------------------------------------------------
@@ -170,14 +184,25 @@ class RamState:
             self.deaths += 1
         self.prev_cam, self.prev_lives = cam, lives
         ma, mb = self._mario_pos()
+        
+        # Check level finish flag if address is populated
+        cleared = False
+        if CLEAR_FLAG_ADDR is not None:
+            try:
+                cleared = bool(mem.read(CLEAR_FLAG_ADDR, CLEAR_FLAG_ADDR, 1, False) != 0)
+            except Exception:
+                pass
+
         return {"lives": lives, "cam": cam, "cam_dx": cam_dx,
                 "acc_cam": self.acc_cam, "progress": progress,
                 "odo": odo, "y": y, "vel": vel, "died": died,
-                "deaths": self.deaths, "mario_A": ma, "mario_B": mb}
+                "deaths": self.deaths, "mario_A": ma, "mario_B": mb,
+                "cleared": cleared}
 
     def reset(self):
         self.prev_cam = None
         self.acc_cam = 0.0
         self.max_acc = 0.0
         self.prev_lives = None
+        self.prev_enemies = {}
         # mario_base persists (same savestate => identical memory layout); rediscover on failure

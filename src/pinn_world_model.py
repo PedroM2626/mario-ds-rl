@@ -120,6 +120,12 @@ def shaped_step(model, s, action, cfg: ShapingConfig):
     gy = torch.exp(-((ey.abs() / cfg.ey_s) ** 2))
     enemy_danger = (active * gx * gy).sum(dim=-1)
     pit_danger = ns[:, 4] * (1.0 - ns[:, 17])  # on ground with a pit in the next column
+
+    # Grounded lethal collision check: within hitbox unless falling downward (stomp)
+    stomp = (ns[:, IDX_VY] < -0.1).unsqueeze(-1) & (ey > 0.0)
+    lethal = (active * (ex.abs() < 18.0) * (ey.abs() < 18.0) * (~stomp).float()).sum(dim=-1) > 0.0
+    p = torch.where(lethal, torch.zeros_like(p), p)
+
     # epistemic-style pessimism: penalise plans whose value rests on unpredictable
     # enemy motion (heteroscedastic sigma on the enemy-x dimensions).
     sigma_ex = torch.exp(0.5 * logvar[:, ENEMY_DX])
@@ -129,6 +135,7 @@ def shaped_step(model, s, action, cfg: ShapingConfig):
               - cfg.pit * pit_danger
               - cfg.uncertainty * unc
               - cfg.step)
+    shaped = torch.where(lethal, shaped - 15.0, shaped)
     return ns, shaped, p
 
 

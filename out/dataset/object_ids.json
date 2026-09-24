@@ -1,0 +1,4120 @@
+{
+ "source": "ref/nsmb-decomp (CC0 clean-room decompilation, early stage)",
+ "lookup": "CurrentProfileTable[object_id]->constructor(); see src/Bases/Base.cpp:185",
+ "units": {
+  "fixed_point": "0x1000 == 1 pixel (12 fractional bits)",
+  "evidence": "src/AAA.hpp:17 _FixedFlt(flt)*4096; src/Bases/StageEntity.cpp:100 viewOffset.x << 0xc; src/Bases/Coin.cpp:650 vs :705 (8 px == 0x8000)"
+ },
+ "tile_px": 16,
+ "fps": 60,
+ "profiles": [
+  {
+   "id": 2,
+   "class": "DebugScene",
+   "create": "create",
+   "render_priority": 9,
+   "resource_loader": null,
+   "slot_comment_agrees": null,
+   "src": "Scenes\\DebugScene.cpp"
+  },
+  {
+   "id": 3,
+   "class": "StageScene",
+   "create": "create",
+   "render_priority": 10,
+   "resource_loader": null,
+   "slot_comment_agrees": null,
+   "src": "Scenes\\StageScene.cpp"
+  },
+  {
+   "id": 6,
+   "class": "VsMainMenu",
+   "create": "create",
+   "render_priority": 14,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\VsMainMenu.cpp"
+  },
+  {
+   "id": 7,
+   "class": "SaveScene",
+   "create": "create",
+   "render_priority": 15,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\SaveScene.cpp"
+  },
+  {
+   "id": 10,
+   "class": "VsResultsScreen",
+   "create": "create",
+   "render_priority": 17,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\VsResultsScreen.cpp"
+  },
+  {
+   "id": 12,
+   "class": "EndingScene",
+   "create": "create",
+   "render_priority": 19,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\EndingScene.cpp"
+  },
+  {
+   "id": 14,
+   "class": "GameOverScene",
+   "create": "create",
+   "render_priority": 21,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\GameOverScene.cpp"
+  },
+  {
+   "id": 15,
+   "class": "VsIntroScene",
+   "create": "create",
+   "render_priority": 22,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\VsIntroScene.cpp"
+  },
+  {
+   "id": 17,
+   "class": "KeyScene",
+   "create": "create",
+   "render_priority": 24,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\KeyScene.cpp"
+  },
+  {
+   "id": 20,
+   "class": "Object20",
+   "create": "create",
+   "render_priority": 27,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object20.cpp"
+  },
+  {
+   "id": 21,
+   "class": "Player",
+   "create": "create",
+   "render_priority": 28,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Player.cpp"
+  },
+  {
+   "id": 23,
+   "class": "Object23",
+   "create": "create",
+   "render_priority": 31,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object23.cpp"
+  },
+  {
+   "id": 24,
+   "class": "Object24",
+   "create": "create",
+   "render_priority": 32,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object23.cpp"
+  },
+  {
+   "id": 25,
+   "class": "Object25",
+   "create": "create",
+   "render_priority": 33,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object23.cpp"
+  },
+  {
+   "id": 26,
+   "class": "Object26",
+   "create": "create",
+   "render_priority": 34,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object23.cpp"
+  },
+  {
+   "id": 27,
+   "class": "Object27",
+   "create": "create",
+   "render_priority": 38,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object27.cpp"
+  },
+  {
+   "id": 28,
+   "class": "Object28",
+   "create": "create",
+   "render_priority": 40,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object28.cpp"
+  },
+  {
+   "id": 29,
+   "class": "Object29",
+   "create": "create",
+   "render_priority": 41,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object29.cpp"
+  },
+  {
+   "id": 30,
+   "class": "Object30",
+   "create": "create",
+   "render_priority": 42,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object28.cpp"
+  },
+  {
+   "id": 35,
+   "class": "Object35",
+   "create": "create",
+   "render_priority": 48,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object35.cpp"
+  },
+  {
+   "id": 36,
+   "class": "Object36",
+   "create": "create",
+   "render_priority": 49,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object36.cpp"
+  },
+  {
+   "id": 37,
+   "class": "Object37",
+   "create": "create",
+   "render_priority": 51,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object37.cpp"
+  },
+  {
+   "id": 38,
+   "class": "Object38",
+   "create": "create",
+   "render_priority": 52,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object37.cpp"
+  },
+  {
+   "id": 39,
+   "class": "Object39",
+   "create": "create",
+   "render_priority": 53,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object39.cpp"
+  },
+  {
+   "id": 40,
+   "class": "Object40",
+   "create": "create",
+   "render_priority": 54,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object40.cpp"
+  },
+  {
+   "id": 41,
+   "class": "Object41",
+   "create": "create",
+   "render_priority": 55,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object41.cpp"
+  },
+  {
+   "id": 42,
+   "class": "Object42",
+   "create": "create",
+   "render_priority": 56,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object41.cpp"
+  },
+  {
+   "id": 43,
+   "class": "Object43",
+   "create": "create",
+   "render_priority": 57,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object43.cpp"
+  },
+  {
+   "id": 44,
+   "class": "Object44",
+   "create": "create",
+   "render_priority": 58,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object44.cpp"
+  },
+  {
+   "id": 45,
+   "class": "Object45",
+   "create": "create",
+   "render_priority": 59,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object45.cpp"
+  },
+  {
+   "id": 46,
+   "class": "FireSnake",
+   "create": "create_unused",
+   "render_priority": 60,
+   "resource_loader": "FireSnake::loadResources,",
+   "slot_comment_agrees": null,
+   "src": "Bases\\FireSnake.hpp"
+  },
+  {
+   "id": 47,
+   "class": "Object47",
+   "create": "create",
+   "render_priority": 61,
+   "resource_loader": null,
+   "slot_comment_agrees": null,
+   "src": "Bases\\stubs\\Object47.cpp"
+  },
+  {
+   "id": 48,
+   "class": "Object47",
+   "create": "create2",
+   "render_priority": 62,
+   "resource_loader": null,
+   "slot_comment_agrees": null,
+   "src": "Bases\\stubs\\Object47.cpp"
+  },
+  {
+   "id": 49,
+   "class": "Object49",
+   "create": "create",
+   "render_priority": 63,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object49.cpp"
+  },
+  {
+   "id": 50,
+   "class": "Object50",
+   "create": "create",
+   "render_priority": 64,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object50.cpp"
+  },
+  {
+   "id": 51,
+   "class": "Object51",
+   "create": "create",
+   "render_priority": 65,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object51.cpp"
+  },
+  {
+   "id": 52,
+   "class": "Object52",
+   "create": "create",
+   "render_priority": 66,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object51.cpp"
+  },
+  {
+   "id": 53,
+   "class": "Object53",
+   "create": "create",
+   "render_priority": 67,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object51.cpp"
+  },
+  {
+   "id": 54,
+   "class": "Object54",
+   "create": "create",
+   "render_priority": 68,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object54.cpp"
+  },
+  {
+   "id": 55,
+   "class": "Object55",
+   "create": "create",
+   "render_priority": 69,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object55.cpp"
+  },
+  {
+   "id": 56,
+   "class": "Object56",
+   "create": "create",
+   "render_priority": 70,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object55.cpp"
+  },
+  {
+   "id": 57,
+   "class": "Object57",
+   "create": "create",
+   "render_priority": 71,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object57.cpp"
+  },
+  {
+   "id": 58,
+   "class": "Object58",
+   "create": "create",
+   "render_priority": 72,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object58.cpp"
+  },
+  {
+   "id": 59,
+   "class": "Object59",
+   "create": "create",
+   "render_priority": 73,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object59.cpp"
+  },
+  {
+   "id": 60,
+   "class": "Object60",
+   "create": "create",
+   "render_priority": 74,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object60.cpp"
+  },
+  {
+   "id": 61,
+   "class": "Object61",
+   "create": "create",
+   "render_priority": 75,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object61.cpp"
+  },
+  {
+   "id": 62,
+   "class": "Object62",
+   "create": "create",
+   "render_priority": 76,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object62.cpp"
+  },
+  {
+   "id": 63,
+   "class": "Object63",
+   "create": "create",
+   "render_priority": 77,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object63.cpp"
+  },
+  {
+   "id": 64,
+   "class": "Object64",
+   "create": "create",
+   "render_priority": 78,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object64.cpp"
+  },
+  {
+   "id": 65,
+   "class": "Object65",
+   "create": "create",
+   "render_priority": 79,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object65.cpp"
+  },
+  {
+   "id": 67,
+   "class": "Object67",
+   "create": "create",
+   "render_priority": 159,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object67.cpp"
+  },
+  {
+   "id": 68,
+   "class": "Object68",
+   "create": "create",
+   "render_priority": 80,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object68.cpp"
+  },
+  {
+   "id": 69,
+   "class": "Object69",
+   "create": "create",
+   "render_priority": 81,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object69.cpp"
+  },
+  {
+   "id": 70,
+   "class": "Object70",
+   "create": "create",
+   "render_priority": 82,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object70.cpp"
+  },
+  {
+   "id": 71,
+   "class": "Object71",
+   "create": "create",
+   "render_priority": 83,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object71.cpp"
+  },
+  {
+   "id": 72,
+   "class": "Object72",
+   "create": "create",
+   "render_priority": 84,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object72.cpp"
+  },
+  {
+   "id": 73,
+   "class": "Object73",
+   "create": "create",
+   "render_priority": 85,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object73.cpp"
+  },
+  {
+   "id": 74,
+   "class": "Object74",
+   "create": "create",
+   "render_priority": 86,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object74.cpp"
+  },
+  {
+   "id": 75,
+   "class": "Object75",
+   "create": "create",
+   "render_priority": 87,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object75.cpp"
+  },
+  {
+   "id": 76,
+   "class": "Object76",
+   "create": "create",
+   "render_priority": 88,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object75.cpp"
+  },
+  {
+   "id": 77,
+   "class": "Object77",
+   "create": "create",
+   "render_priority": 89,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object77.cpp"
+  },
+  {
+   "id": 78,
+   "class": "Object78",
+   "create": "create",
+   "render_priority": 90,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object78.cpp"
+  },
+  {
+   "id": 79,
+   "class": "Object79",
+   "create": "create",
+   "render_priority": 94,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object79.cpp"
+  },
+  {
+   "id": 80,
+   "class": "Object80",
+   "create": "create",
+   "render_priority": 95,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object80.cpp"
+  },
+  {
+   "id": 81,
+   "class": "Object81",
+   "create": "create",
+   "render_priority": 102,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object81.cpp"
+  },
+  {
+   "id": 82,
+   "class": "Object82",
+   "create": "create",
+   "render_priority": 104,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object82.cpp"
+  },
+  {
+   "id": 86,
+   "class": "Object86",
+   "create": "create",
+   "render_priority": 109,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object86.cpp"
+  },
+  {
+   "id": 87,
+   "class": "Object87",
+   "create": "create",
+   "render_priority": 110,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object87.cpp"
+  },
+  {
+   "id": 88,
+   "class": "Object88",
+   "create": "create",
+   "render_priority": 111,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object68.cpp"
+  },
+  {
+   "id": 89,
+   "class": "Object89",
+   "create": "create",
+   "render_priority": 112,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object68.cpp"
+  },
+  {
+   "id": 90,
+   "class": "Object90",
+   "create": "create",
+   "render_priority": 126,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object90.cpp"
+  },
+  {
+   "id": 91,
+   "class": "Object91",
+   "create": "create",
+   "render_priority": 127,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object91.cpp"
+  },
+  {
+   "id": 92,
+   "class": "Object92",
+   "create": "create",
+   "render_priority": 119,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object92.cpp"
+  },
+  {
+   "id": 93,
+   "class": "Object93",
+   "create": "create",
+   "render_priority": 121,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object93.cpp"
+  },
+  {
+   "id": 94,
+   "class": "Object94",
+   "create": "create",
+   "render_priority": 163,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object94.cpp"
+  },
+  {
+   "id": 95,
+   "class": "Object95",
+   "create": "create",
+   "render_priority": 164,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object94.cpp"
+  },
+  {
+   "id": 96,
+   "class": "Object96",
+   "create": "create",
+   "render_priority": 244,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object96.cpp"
+  },
+  {
+   "id": 97,
+   "class": "Object97",
+   "create": "create",
+   "render_priority": 253,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object97.cpp"
+  },
+  {
+   "id": 98,
+   "class": "Object98",
+   "create": "create",
+   "render_priority": 232,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object98.cpp"
+  },
+  {
+   "id": 99,
+   "class": "Object99",
+   "create": "create",
+   "render_priority": 227,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object99.cpp"
+  },
+  {
+   "id": 100,
+   "class": "Object100",
+   "create": "create",
+   "render_priority": 228,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object100.cpp"
+  },
+  {
+   "id": 101,
+   "class": "Object101",
+   "create": "create",
+   "render_priority": 229,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object101.cpp"
+  },
+  {
+   "id": 102,
+   "class": "Object102",
+   "create": "create",
+   "render_priority": 230,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object101.cpp"
+  },
+  {
+   "id": 103,
+   "class": "Object103",
+   "create": "create",
+   "render_priority": 224,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object103.cpp"
+  },
+  {
+   "id": 104,
+   "class": "Object104",
+   "create": "create",
+   "render_priority": 225,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object104.cpp"
+  },
+  {
+   "id": 105,
+   "class": "Object105",
+   "create": "create",
+   "render_priority": 165,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object105.cpp"
+  },
+  {
+   "id": 106,
+   "class": "FireSnake",
+   "create": "create",
+   "render_priority": 122,
+   "resource_loader": "FireSnake::loadResources,",
+   "slot_comment_agrees": null,
+   "src": "Bases\\FireSnake.hpp"
+  },
+  {
+   "id": 107,
+   "class": "Object107",
+   "create": "create",
+   "render_priority": 123,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object107.cpp"
+  },
+  {
+   "id": 108,
+   "class": "Object108",
+   "create": "create",
+   "render_priority": 124,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object108.cpp"
+  },
+  {
+   "id": 109,
+   "class": "Object109",
+   "create": "create",
+   "render_priority": 125,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object109.cpp"
+  },
+  {
+   "id": 110,
+   "class": "Object110",
+   "create": "create",
+   "render_priority": 128,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object110.cpp"
+  },
+  {
+   "id": 111,
+   "class": "Object111",
+   "create": "create",
+   "render_priority": 129,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object111.cpp"
+  },
+  {
+   "id": 112,
+   "class": "Object112",
+   "create": "create",
+   "render_priority": 130,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object112.cpp"
+  },
+  {
+   "id": 113,
+   "class": "Object113",
+   "create": "create",
+   "render_priority": 131,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object113.cpp"
+  },
+  {
+   "id": 114,
+   "class": "Object114",
+   "create": "create",
+   "render_priority": 132,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object114.cpp"
+  },
+  {
+   "id": 115,
+   "class": "Object115",
+   "create": "create",
+   "render_priority": 133,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object115.cpp"
+  },
+  {
+   "id": 116,
+   "class": "Object116",
+   "create": "create",
+   "render_priority": 134,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object116.cpp"
+  },
+  {
+   "id": 117,
+   "class": "Object117",
+   "create": "create",
+   "render_priority": 135,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object117.cpp"
+  },
+  {
+   "id": 118,
+   "class": "Object118",
+   "create": "create",
+   "render_priority": 136,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object118.cpp"
+  },
+  {
+   "id": 119,
+   "class": "Object119",
+   "create": "create",
+   "render_priority": 138,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object119.cpp"
+  },
+  {
+   "id": 120,
+   "class": "Object120",
+   "create": "create",
+   "render_priority": 139,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object120.cpp"
+  },
+  {
+   "id": 121,
+   "class": "Object121",
+   "create": "create",
+   "render_priority": 140,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object121.cpp"
+  },
+  {
+   "id": 122,
+   "class": "Object122",
+   "create": "create",
+   "render_priority": 141,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object122.cpp"
+  },
+  {
+   "id": 123,
+   "class": "Object123",
+   "create": "create",
+   "render_priority": 142,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object40.cpp"
+  },
+  {
+   "id": 124,
+   "class": "Object124",
+   "create": "create",
+   "render_priority": 143,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object124.cpp"
+  },
+  {
+   "id": 125,
+   "class": "Object125",
+   "create": "create",
+   "render_priority": 182,
+   "resource_loader": "Object125::loadResources",
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object125.cpp"
+  },
+  {
+   "id": 126,
+   "class": "Object126",
+   "create": "create",
+   "render_priority": 145,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object126.cpp"
+  },
+  {
+   "id": 127,
+   "class": "Object127",
+   "create": "create",
+   "render_priority": 184,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object127.cpp"
+  },
+  {
+   "id": 128,
+   "class": "Object128",
+   "create": "create",
+   "render_priority": 146,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object128.cpp"
+  },
+  {
+   "id": 129,
+   "class": "Object129",
+   "create": "create",
+   "render_priority": 147,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object129.cpp"
+  },
+  {
+   "id": 130,
+   "class": "Object130",
+   "create": "create",
+   "render_priority": 148,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object130.cpp"
+  },
+  {
+   "id": 131,
+   "class": "Object131",
+   "create": "create",
+   "render_priority": 149,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object131.cpp"
+  },
+  {
+   "id": 132,
+   "class": "Object132",
+   "create": "create",
+   "render_priority": 150,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object131.cpp"
+  },
+  {
+   "id": 133,
+   "class": "Object133",
+   "create": "create",
+   "render_priority": 151,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object131.cpp"
+  },
+  {
+   "id": 134,
+   "class": "Object134",
+   "create": "create",
+   "render_priority": 152,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object134.cpp"
+  },
+  {
+   "id": 135,
+   "class": "Object135",
+   "create": "create",
+   "render_priority": 153,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object135.cpp"
+  },
+  {
+   "id": 136,
+   "class": "Object136",
+   "create": "create",
+   "render_priority": 154,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object136.cpp"
+  },
+  {
+   "id": 137,
+   "class": "Object137",
+   "create": "create",
+   "render_priority": 113,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object20.cpp"
+  },
+  {
+   "id": 138,
+   "class": "Object138",
+   "create": "create",
+   "render_priority": 114,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object20.cpp"
+  },
+  {
+   "id": 139,
+   "class": "Object139",
+   "create": "create",
+   "render_priority": 115,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object20.cpp"
+  },
+  {
+   "id": 140,
+   "class": "Object140",
+   "create": "create",
+   "render_priority": 116,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object20.cpp"
+  },
+  {
+   "id": 141,
+   "class": "Object141",
+   "create": "create",
+   "render_priority": 117,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object20.cpp"
+  },
+  {
+   "id": 142,
+   "class": "Object142",
+   "create": "create",
+   "render_priority": 118,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object20.cpp"
+  },
+  {
+   "id": 143,
+   "class": "Object143",
+   "create": "create",
+   "render_priority": 166,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object143.cpp"
+  },
+  {
+   "id": 144,
+   "class": "Object144",
+   "create": "create",
+   "render_priority": 167,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object144.cpp"
+  },
+  {
+   "id": 145,
+   "class": "Object145",
+   "create": "create",
+   "render_priority": 168,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object144.cpp"
+  },
+  {
+   "id": 146,
+   "class": "Object146",
+   "create": "create",
+   "render_priority": 169,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object146.cpp"
+  },
+  {
+   "id": 147,
+   "class": "Object147",
+   "create": "create",
+   "render_priority": 170,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object147.cpp"
+  },
+  {
+   "id": 148,
+   "class": "Object148",
+   "create": "create",
+   "render_priority": 172,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object148.cpp"
+  },
+  {
+   "id": 149,
+   "class": "Object149",
+   "create": "create",
+   "render_priority": 173,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object149.cpp"
+  },
+  {
+   "id": 150,
+   "class": "Object150",
+   "create": "create",
+   "render_priority": 174,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object150.cpp"
+  },
+  {
+   "id": 151,
+   "class": "Object151",
+   "create": "create",
+   "render_priority": 175,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object151.cpp"
+  },
+  {
+   "id": 152,
+   "class": "Object152",
+   "create": "create",
+   "render_priority": 176,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object152.cpp"
+  },
+  {
+   "id": 153,
+   "class": "Object153",
+   "create": "create",
+   "render_priority": 177,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object153.cpp"
+  },
+  {
+   "id": 154,
+   "class": "Object154",
+   "create": "create",
+   "render_priority": 179,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object154.cpp"
+  },
+  {
+   "id": 155,
+   "class": "Object155",
+   "create": "create",
+   "render_priority": 180,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object155.cpp"
+  },
+  {
+   "id": 157,
+   "class": "Object157",
+   "create": "create",
+   "render_priority": 183,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object157.cpp"
+  },
+  {
+   "id": 158,
+   "class": "Object158",
+   "create": "create",
+   "render_priority": 186,
+   "resource_loader": null,
+   "slot_comment_agrees": null,
+   "src": "Bases\\stubs\\Object158.cpp"
+  },
+  {
+   "id": 159,
+   "class": "Object158",
+   "create": "create2",
+   "render_priority": 187,
+   "resource_loader": null,
+   "slot_comment_agrees": null,
+   "src": "Bases\\stubs\\Object158.cpp"
+  },
+  {
+   "id": 160,
+   "class": "Object160",
+   "create": "create",
+   "render_priority": 6,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object160.cpp"
+  },
+  {
+   "id": 161,
+   "class": "Object161",
+   "create": "create",
+   "render_priority": 200,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object161.cpp"
+  },
+  {
+   "id": 162,
+   "class": "Object162",
+   "create": "create",
+   "render_priority": 201,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object162.cpp"
+  },
+  {
+   "id": 163,
+   "class": "Object163",
+   "create": "create",
+   "render_priority": 202,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object162.cpp"
+  },
+  {
+   "id": 164,
+   "class": "Object164",
+   "create": "create",
+   "render_priority": 203,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object164.cpp"
+  },
+  {
+   "id": 165,
+   "class": "Object165",
+   "create": "create",
+   "render_priority": 204,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object165.cpp"
+  },
+  {
+   "id": 166,
+   "class": "Object166",
+   "create": "create",
+   "render_priority": 205,
+   "resource_loader": null,
+   "slot_comment_agrees": null,
+   "src": "Bases\\stubs\\Object166.cpp"
+  },
+  {
+   "id": 167,
+   "class": "Object166",
+   "create": "create2",
+   "render_priority": 206,
+   "resource_loader": null,
+   "slot_comment_agrees": null,
+   "src": "Bases\\stubs\\Object166.cpp"
+  },
+  {
+   "id": 168,
+   "class": "Object168",
+   "create": "create",
+   "render_priority": 207,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object168.cpp"
+  },
+  {
+   "id": 169,
+   "class": "Object169",
+   "create": "create",
+   "render_priority": 208,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object169.cpp"
+  },
+  {
+   "id": 170,
+   "class": "Object170",
+   "create": "create",
+   "render_priority": 209,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object170.cpp"
+  },
+  {
+   "id": 171,
+   "class": "Object171",
+   "create": "create",
+   "render_priority": 210,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object171.cpp"
+  },
+  {
+   "id": 172,
+   "class": "Object172",
+   "create": "create",
+   "render_priority": 211,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object172.cpp"
+  },
+  {
+   "id": 173,
+   "class": "Object173",
+   "create": "create",
+   "render_priority": 212,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object173.cpp"
+  },
+  {
+   "id": 174,
+   "class": "Object174",
+   "create": "create",
+   "render_priority": 213,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object174.cpp"
+  },
+  {
+   "id": 175,
+   "class": "Object175",
+   "create": "create",
+   "render_priority": 214,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object175.cpp"
+  },
+  {
+   "id": 176,
+   "class": "Object176",
+   "create": "create",
+   "render_priority": 215,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object176.cpp"
+  },
+  {
+   "id": 177,
+   "class": "Object177",
+   "create": "create",
+   "render_priority": 216,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object177.cpp"
+  },
+  {
+   "id": 178,
+   "class": "Object178",
+   "create": "create",
+   "render_priority": 217,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object178.cpp"
+  },
+  {
+   "id": 179,
+   "class": "Object179",
+   "create": "create",
+   "render_priority": 218,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object179.cpp"
+  },
+  {
+   "id": 180,
+   "class": "Object180",
+   "create": "create",
+   "render_priority": 219,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object180.cpp"
+  },
+  {
+   "id": 181,
+   "class": "Object181",
+   "create": "create",
+   "render_priority": 220,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object181.cpp"
+  },
+  {
+   "id": 182,
+   "class": "Object182",
+   "create": "create",
+   "render_priority": 221,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object182.cpp"
+  },
+  {
+   "id": 183,
+   "class": "Object183",
+   "create": "create",
+   "render_priority": 222,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object183.cpp"
+  },
+  {
+   "id": 184,
+   "class": "Object184",
+   "create": "create",
+   "render_priority": 223,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object184.cpp"
+  },
+  {
+   "id": 185,
+   "class": "Object185",
+   "create": "create",
+   "render_priority": 226,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object185.cpp"
+  },
+  {
+   "id": 186,
+   "class": "Object186",
+   "create": "create",
+   "render_priority": 231,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object186.cpp"
+  },
+  {
+   "id": 188,
+   "class": "Object188",
+   "create": "create",
+   "render_priority": 234,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object188.cpp"
+  },
+  {
+   "id": 189,
+   "class": "Object189",
+   "create": "create",
+   "render_priority": 235,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object189.cpp"
+  },
+  {
+   "id": 190,
+   "class": "Object190",
+   "create": "create",
+   "render_priority": 236,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object190.cpp"
+  },
+  {
+   "id": 191,
+   "class": "Object191",
+   "create": "create",
+   "render_priority": 237,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object191.cpp"
+  },
+  {
+   "id": 192,
+   "class": "Object192",
+   "create": "create",
+   "render_priority": 238,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object192.cpp"
+  },
+  {
+   "id": 193,
+   "class": "Object193",
+   "create": "create",
+   "render_priority": 239,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object193.cpp"
+  },
+  {
+   "id": 194,
+   "class": "Object194",
+   "create": "create",
+   "render_priority": 240,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object194.cpp"
+  },
+  {
+   "id": 195,
+   "class": "Object195",
+   "create": "create",
+   "render_priority": 241,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object195.cpp"
+  },
+  {
+   "id": 196,
+   "class": "Object196",
+   "create": "create",
+   "render_priority": 242,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object196.cpp"
+  },
+  {
+   "id": 197,
+   "class": "Object197",
+   "create": "create",
+   "render_priority": 243,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object197.cpp"
+  },
+  {
+   "id": 198,
+   "class": "Object198",
+   "create": "create",
+   "render_priority": 245,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object198.cpp"
+  },
+  {
+   "id": 199,
+   "class": "Object199",
+   "create": "create",
+   "render_priority": 246,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object199.cpp"
+  },
+  {
+   "id": 200,
+   "class": "Object200",
+   "create": "create",
+   "render_priority": 247,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object200.cpp"
+  },
+  {
+   "id": 201,
+   "class": "Object201",
+   "create": "create",
+   "render_priority": 248,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object201.cpp"
+  },
+  {
+   "id": 202,
+   "class": "Object202",
+   "create": "create",
+   "render_priority": 249,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object202.cpp"
+  },
+  {
+   "id": 203,
+   "class": "Object203",
+   "create": "create",
+   "render_priority": 250,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object203.cpp"
+  },
+  {
+   "id": 204,
+   "class": "Object204",
+   "create": "create",
+   "render_priority": 251,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object204.cpp"
+  },
+  {
+   "id": 205,
+   "class": "Object205",
+   "create": "create",
+   "render_priority": 252,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object205.cpp"
+  },
+  {
+   "id": 206,
+   "class": "Object206",
+   "create": "create",
+   "render_priority": 120,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object206.cpp"
+  },
+  {
+   "id": 207,
+   "class": "Object207",
+   "create": "create",
+   "render_priority": 254,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object207.cpp"
+  },
+  {
+   "id": 208,
+   "class": "Object208",
+   "create": "create",
+   "render_priority": 255,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object208.cpp"
+  },
+  {
+   "id": 209,
+   "class": "Object209",
+   "create": "create",
+   "render_priority": 275,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object209.cpp"
+  },
+  {
+   "id": 210,
+   "class": "Object210",
+   "create": "create",
+   "render_priority": 256,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object210.cpp"
+  },
+  {
+   "id": 211,
+   "class": "Object211",
+   "create": "create",
+   "render_priority": 257,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object211.cpp"
+  },
+  {
+   "id": 212,
+   "class": "Object212",
+   "create": "create",
+   "render_priority": 258,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object212.cpp"
+  },
+  {
+   "id": 213,
+   "class": "Object213",
+   "create": "create",
+   "render_priority": 259,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object213.cpp"
+  },
+  {
+   "id": 214,
+   "class": "Object214",
+   "create": "create",
+   "render_priority": 276,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object214.cpp"
+  },
+  {
+   "id": 215,
+   "class": "Object215",
+   "create": "create",
+   "render_priority": 263,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object215.cpp"
+  },
+  {
+   "id": 216,
+   "class": "Object216",
+   "create": "create",
+   "render_priority": 264,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object216.cpp"
+  },
+  {
+   "id": 217,
+   "class": "Object217",
+   "create": "create",
+   "render_priority": 265,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object217.cpp"
+  },
+  {
+   "id": 218,
+   "class": "Object218",
+   "create": "create",
+   "render_priority": 266,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object217.cpp"
+  },
+  {
+   "id": 219,
+   "class": "Object219",
+   "create": "create",
+   "render_priority": 267,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object217.cpp"
+  },
+  {
+   "id": 220,
+   "class": "Object220",
+   "create": "create",
+   "render_priority": 268,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object220.cpp"
+  },
+  {
+   "id": 221,
+   "class": "Object221",
+   "create": "create",
+   "render_priority": 269,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object221.cpp"
+  },
+  {
+   "id": 222,
+   "class": "Object222",
+   "create": "create",
+   "render_priority": 270,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object222.cpp"
+  },
+  {
+   "id": 223,
+   "class": "Object223",
+   "create": "create",
+   "render_priority": 271,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object222.cpp"
+  },
+  {
+   "id": 224,
+   "class": "Object224",
+   "create": "create",
+   "render_priority": 178,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object224.cpp"
+  },
+  {
+   "id": 225,
+   "class": "Object225",
+   "create": "create",
+   "render_priority": 188,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object225.cpp"
+  },
+  {
+   "id": 226,
+   "class": "Object226",
+   "create": "create",
+   "render_priority": 189,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object226.cpp"
+  },
+  {
+   "id": 227,
+   "class": "Object227",
+   "create": "create",
+   "render_priority": 190,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object227.cpp"
+  },
+  {
+   "id": 228,
+   "class": "Object228",
+   "create": "create",
+   "render_priority": 191,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object228.cpp"
+  },
+  {
+   "id": 229,
+   "class": "Object229",
+   "create": "create",
+   "render_priority": 192,
+   "resource_loader": "Object229::func_ov099_02185eb4,",
+   "slot_comment_agrees": null,
+   "src": "Bases\\Object229.hpp"
+  },
+  {
+   "id": 230,
+   "class": "Object230",
+   "create": "create",
+   "render_priority": 193,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object230.cpp"
+  },
+  {
+   "id": 231,
+   "class": "Object231",
+   "create": "create",
+   "render_priority": 194,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object231.cpp"
+  },
+  {
+   "id": 232,
+   "class": "Object232",
+   "create": "create",
+   "render_priority": 195,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object232.cpp"
+  },
+  {
+   "id": 233,
+   "class": "Object233",
+   "create": "create",
+   "render_priority": 196,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object233.cpp"
+  },
+  {
+   "id": 234,
+   "class": "Object234",
+   "create": "create",
+   "render_priority": 197,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object234.cpp"
+  },
+  {
+   "id": 235,
+   "class": "Object235",
+   "create": "create",
+   "render_priority": 198,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object235.cpp"
+  },
+  {
+   "id": 236,
+   "class": "Object236",
+   "create": "create",
+   "render_priority": 199,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object236.cpp"
+  },
+  {
+   "id": 237,
+   "class": "Object237",
+   "create": "create",
+   "render_priority": 50,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object237.cpp"
+  },
+  {
+   "id": 238,
+   "class": "Object238",
+   "create": "create",
+   "render_priority": 39,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object27.cpp"
+  },
+  {
+   "id": 239,
+   "class": "Object239",
+   "create": "create",
+   "render_priority": 30,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object239.cpp"
+  },
+  {
+   "id": 240,
+   "class": "Object240",
+   "create": "create",
+   "render_priority": 43,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object240.cpp"
+  },
+  {
+   "id": 241,
+   "class": "Object241",
+   "create": "create",
+   "render_priority": 277,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object241.cpp"
+  },
+  {
+   "id": 242,
+   "class": "Object242",
+   "create": "create",
+   "render_priority": 96,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object242.cpp"
+  },
+  {
+   "id": 243,
+   "class": "Object243",
+   "create": "create",
+   "render_priority": 97,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object242.cpp"
+  },
+  {
+   "id": 244,
+   "class": "Object244",
+   "create": "create",
+   "render_priority": 98,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object242.cpp"
+  },
+  {
+   "id": 245,
+   "class": "Object245",
+   "create": "create",
+   "render_priority": 99,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object242.cpp"
+  },
+  {
+   "id": 246,
+   "class": "Object246",
+   "create": "create",
+   "render_priority": 100,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object242.cpp"
+  },
+  {
+   "id": 247,
+   "class": "Object247",
+   "create": "create",
+   "render_priority": 101,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object242.cpp"
+  },
+  {
+   "id": 248,
+   "class": "Object248",
+   "create": "create",
+   "render_priority": 36,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object248.cpp"
+  },
+  {
+   "id": 249,
+   "class": "Object249",
+   "create": "create",
+   "render_priority": 37,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object249.cpp"
+  },
+  {
+   "id": 250,
+   "class": "Object250",
+   "create": "create",
+   "render_priority": 106,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object250.cpp"
+  },
+  {
+   "id": 251,
+   "class": "Object251",
+   "create": "create",
+   "render_priority": 105,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object251.cpp"
+  },
+  {
+   "id": 252,
+   "class": "Object252",
+   "create": "create",
+   "render_priority": 107,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object251.cpp"
+  },
+  {
+   "id": 253,
+   "class": "Object253",
+   "create": "create",
+   "render_priority": 108,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object251.cpp"
+  },
+  {
+   "id": 254,
+   "class": "SpinBlock",
+   "create": "create",
+   "render_priority": 91,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\SpinBlock.cpp"
+  },
+  {
+   "id": 255,
+   "class": "Object255",
+   "create": "create",
+   "render_priority": 92,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\SpinBlock.cpp"
+  },
+  {
+   "id": 256,
+   "class": "Object256",
+   "create": "create",
+   "render_priority": 93,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\SpinBlock.cpp"
+  },
+  {
+   "id": 257,
+   "class": "Object257",
+   "create": "create",
+   "render_priority": 137,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object257.cpp"
+  },
+  {
+   "id": 258,
+   "class": "Object258",
+   "create": "create",
+   "render_priority": 171,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object258.cpp"
+  },
+  {
+   "id": 259,
+   "class": "Object259",
+   "create": "create",
+   "render_priority": 144,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object259.cpp"
+  },
+  {
+   "id": 260,
+   "class": "Object260",
+   "create": "create",
+   "render_priority": 260,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object260.cpp"
+  },
+  {
+   "id": 261,
+   "class": "Object261",
+   "create": "create",
+   "render_priority": 261,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object261.cpp"
+  },
+  {
+   "id": 262,
+   "class": "Object262",
+   "create": "create",
+   "render_priority": 35,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object262.cpp"
+  },
+  {
+   "id": 263,
+   "class": "Object263",
+   "create": "create",
+   "render_priority": 262,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object263.cpp"
+  },
+  {
+   "id": 264,
+   "class": "Object264",
+   "create": "create",
+   "render_priority": 185,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object264.cpp"
+  },
+  {
+   "id": 265,
+   "class": "Object265",
+   "create": "create",
+   "render_priority": 155,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object265.cpp"
+  },
+  {
+   "id": 266,
+   "class": "Object266",
+   "create": "create",
+   "render_priority": 156,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object266.cpp"
+  },
+  {
+   "id": 267,
+   "class": "Object267",
+   "create": "create",
+   "render_priority": 272,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object267.cpp"
+  },
+  {
+   "id": 268,
+   "class": "Object268",
+   "create": "create",
+   "render_priority": 157,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object268.cpp"
+  },
+  {
+   "id": 269,
+   "class": "Object269",
+   "create": "create",
+   "render_priority": 103,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object269.cpp"
+  },
+  {
+   "id": 270,
+   "class": "Object270",
+   "create": "create",
+   "render_priority": 278,
+   "resource_loader": null,
+   "slot_comment_agrees": null,
+   "src": "Bases\\stubs\\Object270.cpp"
+  },
+  {
+   "id": 271,
+   "class": "Object270",
+   "create": "create2",
+   "render_priority": 279,
+   "resource_loader": null,
+   "slot_comment_agrees": null,
+   "src": "Bases\\stubs\\Object270.cpp"
+  },
+  {
+   "id": 272,
+   "class": "Object272",
+   "create": "create",
+   "render_priority": 280,
+   "resource_loader": null,
+   "slot_comment_agrees": null,
+   "src": "Bases\\stubs\\Object272.cpp"
+  },
+  {
+   "id": 273,
+   "class": "Object272",
+   "create": "create2",
+   "render_priority": 281,
+   "resource_loader": null,
+   "slot_comment_agrees": null,
+   "src": "Bases\\stubs\\Object272.cpp"
+  },
+  {
+   "id": 274,
+   "class": "Object274",
+   "create": "create",
+   "render_priority": 282,
+   "resource_loader": null,
+   "slot_comment_agrees": null,
+   "src": "Bases\\stubs\\Object274.cpp"
+  },
+  {
+   "id": 275,
+   "class": "Object274",
+   "create": "create2",
+   "render_priority": 283,
+   "resource_loader": null,
+   "slot_comment_agrees": null,
+   "src": "Bases\\stubs\\Object274.cpp"
+  },
+  {
+   "id": 276,
+   "class": "Object276",
+   "create": "create",
+   "render_priority": 284,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object276.cpp"
+  },
+  {
+   "id": 277,
+   "class": "Object277",
+   "create": "create",
+   "render_priority": 285,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object277.cpp"
+  },
+  {
+   "id": 278,
+   "class": "Object278",
+   "create": "create",
+   "render_priority": 309,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object278.cpp"
+  },
+  {
+   "id": 279,
+   "class": "Object279",
+   "create": "create",
+   "render_priority": 310,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object278.cpp"
+  },
+  {
+   "id": 280,
+   "class": "Object280",
+   "create": "create",
+   "render_priority": 308,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object280.cpp"
+  },
+  {
+   "id": 281,
+   "class": "Object281",
+   "create": "create",
+   "render_priority": 311,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object280.cpp"
+  },
+  {
+   "id": 282,
+   "class": "Object282",
+   "create": "create",
+   "render_priority": 286,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object282.cpp"
+  },
+  {
+   "id": 283,
+   "class": "Object274",
+   "create": "create3",
+   "render_priority": 287,
+   "resource_loader": null,
+   "slot_comment_agrees": null,
+   "src": "Bases\\stubs\\Object274.cpp"
+  },
+  {
+   "id": 284,
+   "class": "Object274",
+   "create": "create4",
+   "render_priority": 288,
+   "resource_loader": null,
+   "slot_comment_agrees": null,
+   "src": "Bases\\stubs\\Object274.cpp"
+  },
+  {
+   "id": 285,
+   "class": "Object285",
+   "create": "create",
+   "render_priority": 289,
+   "resource_loader": null,
+   "slot_comment_agrees": null,
+   "src": "Bases\\stubs\\Object285.cpp"
+  },
+  {
+   "id": 286,
+   "class": "Object285",
+   "create": "create2",
+   "render_priority": 290,
+   "resource_loader": null,
+   "slot_comment_agrees": null,
+   "src": "Bases\\stubs\\Object285.cpp"
+  },
+  {
+   "id": 301,
+   "class": "Object301",
+   "create": "create",
+   "render_priority": 273,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object301.cpp"
+  },
+  {
+   "id": 302,
+   "class": "Object302",
+   "create": "create",
+   "render_priority": 274,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object302.cpp"
+  },
+  {
+   "id": 303,
+   "class": "StageLayout",
+   "create": "create",
+   "render_priority": 291,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\StageLayout.cpp"
+  },
+  {
+   "id": 304,
+   "class": "Object304",
+   "create": "create",
+   "render_priority": 5,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object304.cpp"
+  },
+  {
+   "id": 305,
+   "class": "Object305",
+   "create": "create",
+   "render_priority": 11,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object305.cpp"
+  },
+  {
+   "id": 306,
+   "class": "Object306",
+   "create": "create",
+   "render_priority": 297,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object306.cpp"
+  },
+  {
+   "id": 307,
+   "class": "Object307",
+   "create": "create",
+   "render_priority": 298,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object307.cpp"
+  },
+  {
+   "id": 308,
+   "class": "Object308",
+   "create": "create",
+   "render_priority": 299,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object308.cpp"
+  },
+  {
+   "id": 309,
+   "class": "Object309",
+   "create": "create",
+   "render_priority": 300,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object309.cpp"
+  },
+  {
+   "id": 310,
+   "class": "Object310",
+   "create": "create",
+   "render_priority": 301,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object310.cpp"
+  },
+  {
+   "id": 311,
+   "class": "Object311",
+   "create": "create",
+   "render_priority": 302,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object311.cpp"
+  },
+  {
+   "id": 312,
+   "class": "Object312",
+   "create": "create",
+   "render_priority": 303,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object312.cpp"
+  },
+  {
+   "id": 313,
+   "class": "Object313",
+   "create": "create",
+   "render_priority": 304,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object313.cpp"
+  },
+  {
+   "id": 314,
+   "class": "Object314",
+   "create": "create",
+   "render_priority": 305,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object314.cpp"
+  },
+  {
+   "id": 315,
+   "class": "Object315",
+   "create": "create",
+   "render_priority": 306,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object315.cpp"
+  },
+  {
+   "id": 317,
+   "class": "Object317",
+   "create": "create",
+   "render_priority": 292,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object317.cpp"
+  },
+  {
+   "id": 318,
+   "class": "Object318",
+   "create": "create",
+   "render_priority": 1,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object318.cpp"
+  },
+  {
+   "id": 323,
+   "class": "Object323",
+   "create": "create",
+   "render_priority": 3,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object323.cpp"
+  },
+  {
+   "id": 324,
+   "class": "Object324",
+   "create": "create",
+   "render_priority": 4,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object324.cpp"
+  },
+  {
+   "id": 325,
+   "class": "Object325",
+   "create": "create",
+   "render_priority": 307,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object325.cpp"
+  },
+  {
+   "id": 326,
+   "class": "Object326",
+   "create": "create",
+   "render_priority": 326,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object326.cpp"
+  },
+  {
+   "id": 327,
+   "class": "Object327",
+   "create": "create",
+   "render_priority": 327,
+   "resource_loader": null,
+   "slot_comment_agrees": null,
+   "src": "Bases\\stubs\\Object327.cpp"
+  },
+  {
+   "id": 328,
+   "class": "Object328",
+   "create": "create",
+   "render_priority": 328,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object328.cpp"
+  },
+  {
+   "id": 330,
+   "class": "Object330",
+   "create": "create",
+   "render_priority": 330,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object330.cpp"
+  },
+  {
+   "id": 331,
+   "class": "Object331",
+   "create": "create",
+   "render_priority": 331,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object331.cpp"
+  },
+  {
+   "id": 332,
+   "class": "Object332",
+   "create": "create",
+   "render_priority": 332,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object332.cpp"
+  },
+  {
+   "id": 333,
+   "class": "Object333",
+   "create": "create",
+   "render_priority": 333,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object333.cpp"
+  },
+  {
+   "id": 334,
+   "class": "Object334",
+   "create": "create",
+   "render_priority": 334,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object334.cpp"
+  },
+  {
+   "id": 335,
+   "class": "Object335",
+   "create": "create",
+   "render_priority": 335,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object335.cpp"
+  },
+  {
+   "id": 336,
+   "class": "Object336",
+   "create": "create",
+   "render_priority": 336,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object336.cpp"
+  },
+  {
+   "id": 337,
+   "class": "Object337",
+   "create": "create",
+   "render_priority": 337,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object337.cpp"
+  },
+  {
+   "id": 339,
+   "class": "Object339",
+   "create": "create",
+   "render_priority": 339,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object339.cpp"
+  },
+  {
+   "id": 340,
+   "class": "Object340",
+   "create": "create",
+   "render_priority": 340,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object340.cpp"
+  },
+  {
+   "id": 341,
+   "class": "Object341",
+   "create": "create",
+   "render_priority": 341,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object341.cpp"
+  },
+  {
+   "id": 342,
+   "class": "Object342",
+   "create": "create",
+   "render_priority": 342,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object342.cpp"
+  },
+  {
+   "id": 343,
+   "class": "Object343",
+   "create": "create",
+   "render_priority": 343,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object343.cpp"
+  },
+  {
+   "id": 344,
+   "class": "Object344",
+   "create": "create",
+   "render_priority": 344,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object344.cpp"
+  },
+  {
+   "id": 345,
+   "class": "Object345",
+   "create": "create",
+   "render_priority": 345,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object345.cpp"
+  },
+  {
+   "id": 346,
+   "class": "Object346",
+   "create": "create",
+   "render_priority": 346,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object346.cpp"
+  },
+  {
+   "id": 347,
+   "class": "Object347",
+   "create": "create",
+   "render_priority": 347,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object347.cpp"
+  },
+  {
+   "id": 348,
+   "class": "Object348",
+   "create": "create",
+   "render_priority": 348,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object348.cpp"
+  },
+  {
+   "id": 349,
+   "class": "Object349",
+   "create": "create",
+   "render_priority": 349,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object349.cpp"
+  },
+  {
+   "id": 350,
+   "class": "Object350",
+   "create": "create",
+   "render_priority": 350,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object350.cpp"
+  },
+  {
+   "id": 351,
+   "class": "Object351",
+   "create": "create",
+   "render_priority": 351,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object351.cpp"
+  },
+  {
+   "id": 352,
+   "class": "Object352",
+   "create": "create",
+   "render_priority": 352,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object352.cpp"
+  },
+  {
+   "id": 353,
+   "class": "Object353",
+   "create": "create",
+   "render_priority": 353,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object353.cpp"
+  },
+  {
+   "id": 354,
+   "class": "Object354",
+   "create": "create",
+   "render_priority": 354,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object354.cpp"
+  },
+  {
+   "id": 355,
+   "class": "Object355",
+   "create": "create",
+   "render_priority": 355,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object355.cpp"
+  },
+  {
+   "id": 356,
+   "class": "Object356",
+   "create": "create",
+   "render_priority": 356,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object356.cpp"
+  },
+  {
+   "id": 357,
+   "class": "Object357",
+   "create": "create",
+   "render_priority": 357,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object357.cpp"
+  },
+  {
+   "id": 358,
+   "class": "Object358",
+   "create": "create",
+   "render_priority": 358,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object358.cpp"
+  },
+  {
+   "id": 359,
+   "class": "Object359",
+   "create": "create",
+   "render_priority": 359,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object359.cpp"
+  },
+  {
+   "id": 360,
+   "class": "Object360",
+   "create": "create",
+   "render_priority": 360,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object360.cpp"
+  },
+  {
+   "id": 361,
+   "class": "Object361",
+   "create": "create",
+   "render_priority": 361,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object361.cpp"
+  },
+  {
+   "id": 362,
+   "class": "Object362",
+   "create": "create",
+   "render_priority": 362,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object362.cpp"
+  },
+  {
+   "id": 363,
+   "class": "Object363",
+   "create": "create",
+   "render_priority": 363,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object363.cpp"
+  },
+  {
+   "id": 364,
+   "class": "Object364",
+   "create": "create",
+   "render_priority": 364,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object364.cpp"
+  },
+  {
+   "id": 365,
+   "class": "Object365",
+   "create": "create",
+   "render_priority": 365,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object365.cpp"
+  },
+  {
+   "id": 366,
+   "class": "Object366",
+   "create": "create",
+   "render_priority": 366,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object366.cpp"
+  },
+  {
+   "id": 367,
+   "class": "Object367",
+   "create": "create",
+   "render_priority": 367,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object367.cpp"
+  },
+  {
+   "id": 368,
+   "class": "Object368",
+   "create": "create",
+   "render_priority": 368,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object368.cpp"
+  },
+  {
+   "id": 369,
+   "class": "Object369",
+   "create": "create",
+   "render_priority": 369,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object369.cpp"
+  },
+  {
+   "id": 370,
+   "class": "Object370",
+   "create": "create",
+   "render_priority": 370,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object370.cpp"
+  },
+  {
+   "id": 371,
+   "class": "Object371",
+   "create": "create",
+   "render_priority": 371,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object371.cpp"
+  },
+  {
+   "id": 372,
+   "class": "Object372",
+   "create": "create",
+   "render_priority": 372,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object372.cpp"
+  },
+  {
+   "id": 373,
+   "class": "Object373",
+   "create": "create",
+   "render_priority": 373,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object373.cpp"
+  },
+  {
+   "id": 374,
+   "class": "Object374",
+   "create": "create",
+   "render_priority": 374,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object374.cpp"
+  },
+  {
+   "id": 375,
+   "class": "Object375",
+   "create": "create",
+   "render_priority": 375,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object375.cpp"
+  },
+  {
+   "id": 376,
+   "class": "Object376",
+   "create": "create",
+   "render_priority": 376,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object376.cpp"
+  },
+  {
+   "id": 377,
+   "class": "Object377",
+   "create": "create",
+   "render_priority": 377,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object377.cpp"
+  },
+  {
+   "id": 378,
+   "class": "Object378",
+   "create": "create",
+   "render_priority": 378,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object378.cpp"
+  },
+  {
+   "id": 379,
+   "class": "Object379",
+   "create": "create",
+   "render_priority": 379,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object379.cpp"
+  },
+  {
+   "id": 380,
+   "class": "Object380",
+   "create": "create",
+   "render_priority": 380,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object380.cpp"
+  },
+  {
+   "id": 381,
+   "class": "Object381",
+   "create": "create",
+   "render_priority": 381,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object381.cpp"
+  },
+  {
+   "id": 382,
+   "class": "Object382",
+   "create": "create",
+   "render_priority": 382,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object382.cpp"
+  },
+  {
+   "id": 383,
+   "class": "Object383",
+   "create": "create",
+   "render_priority": 383,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object383.cpp"
+  },
+  {
+   "id": 384,
+   "class": "Object384",
+   "create": "create",
+   "render_priority": 384,
+   "resource_loader": null,
+   "slot_comment_agrees": true,
+   "src": "Bases\\stubs\\Object384.cpp"
+  }
+ ],
+ "id_to_classes": {
+  "2": [
+   "DebugScene"
+  ],
+  "3": [
+   "StageScene"
+  ],
+  "6": [
+   "VsMainMenu"
+  ],
+  "7": [
+   "SaveScene"
+  ],
+  "10": [
+   "VsResultsScreen"
+  ],
+  "12": [
+   "EndingScene"
+  ],
+  "14": [
+   "GameOverScene"
+  ],
+  "15": [
+   "VsIntroScene"
+  ],
+  "17": [
+   "KeyScene"
+  ],
+  "20": [
+   "Object20"
+  ],
+  "21": [
+   "Player"
+  ],
+  "23": [
+   "Object23"
+  ],
+  "24": [
+   "Object24"
+  ],
+  "25": [
+   "Object25"
+  ],
+  "26": [
+   "Object26"
+  ],
+  "27": [
+   "Object27"
+  ],
+  "28": [
+   "Object28"
+  ],
+  "29": [
+   "Object29"
+  ],
+  "30": [
+   "Object30"
+  ],
+  "35": [
+   "Object35"
+  ],
+  "36": [
+   "Object36"
+  ],
+  "37": [
+   "Object37"
+  ],
+  "38": [
+   "Object38"
+  ],
+  "39": [
+   "Object39"
+  ],
+  "40": [
+   "Object40"
+  ],
+  "41": [
+   "Object41"
+  ],
+  "42": [
+   "Object42"
+  ],
+  "43": [
+   "Object43"
+  ],
+  "44": [
+   "Object44"
+  ],
+  "45": [
+   "Object45"
+  ],
+  "46": [
+   "FireSnake"
+  ],
+  "47": [
+   "Object47"
+  ],
+  "48": [
+   "Object47"
+  ],
+  "49": [
+   "Object49"
+  ],
+  "50": [
+   "Object50"
+  ],
+  "51": [
+   "Object51"
+  ],
+  "52": [
+   "Object52"
+  ],
+  "53": [
+   "Object53"
+  ],
+  "54": [
+   "Object54"
+  ],
+  "55": [
+   "Object55"
+  ],
+  "56": [
+   "Object56"
+  ],
+  "57": [
+   "Object57"
+  ],
+  "58": [
+   "Object58"
+  ],
+  "59": [
+   "Object59"
+  ],
+  "60": [
+   "Object60"
+  ],
+  "61": [
+   "Object61"
+  ],
+  "62": [
+   "Object62"
+  ],
+  "63": [
+   "Object63"
+  ],
+  "64": [
+   "Object64"
+  ],
+  "65": [
+   "Object65"
+  ],
+  "67": [
+   "Object67"
+  ],
+  "68": [
+   "Object68"
+  ],
+  "69": [
+   "Object69"
+  ],
+  "70": [
+   "Object70"
+  ],
+  "71": [
+   "Object71"
+  ],
+  "72": [
+   "Object72"
+  ],
+  "73": [
+   "Object73"
+  ],
+  "74": [
+   "Object74"
+  ],
+  "75": [
+   "Object75"
+  ],
+  "76": [
+   "Object76"
+  ],
+  "77": [
+   "Object77"
+  ],
+  "78": [
+   "Object78"
+  ],
+  "79": [
+   "Object79"
+  ],
+  "80": [
+   "Object80"
+  ],
+  "81": [
+   "Object81"
+  ],
+  "82": [
+   "Object82"
+  ],
+  "86": [
+   "Object86"
+  ],
+  "87": [
+   "Object87"
+  ],
+  "88": [
+   "Object88"
+  ],
+  "89": [
+   "Object89"
+  ],
+  "90": [
+   "Object90"
+  ],
+  "91": [
+   "Object91"
+  ],
+  "92": [
+   "Object92"
+  ],
+  "93": [
+   "Object93"
+  ],
+  "94": [
+   "Object94"
+  ],
+  "95": [
+   "Object95"
+  ],
+  "96": [
+   "Object96"
+  ],
+  "97": [
+   "Object97"
+  ],
+  "98": [
+   "Object98"
+  ],
+  "99": [
+   "Object99"
+  ],
+  "100": [
+   "Object100"
+  ],
+  "101": [
+   "Object101"
+  ],
+  "102": [
+   "Object102"
+  ],
+  "103": [
+   "Object103"
+  ],
+  "104": [
+   "Object104"
+  ],
+  "105": [
+   "Object105"
+  ],
+  "106": [
+   "FireSnake"
+  ],
+  "107": [
+   "Object107"
+  ],
+  "108": [
+   "Object108"
+  ],
+  "109": [
+   "Object109"
+  ],
+  "110": [
+   "Object110"
+  ],
+  "111": [
+   "Object111"
+  ],
+  "112": [
+   "Object112"
+  ],
+  "113": [
+   "Object113"
+  ],
+  "114": [
+   "Object114"
+  ],
+  "115": [
+   "Object115"
+  ],
+  "116": [
+   "Object116"
+  ],
+  "117": [
+   "Object117"
+  ],
+  "118": [
+   "Object118"
+  ],
+  "119": [
+   "Object119"
+  ],
+  "120": [
+   "Object120"
+  ],
+  "121": [
+   "Object121"
+  ],
+  "122": [
+   "Object122"
+  ],
+  "123": [
+   "Object123"
+  ],
+  "124": [
+   "Object124"
+  ],
+  "125": [
+   "Object125"
+  ],
+  "126": [
+   "Object126"
+  ],
+  "127": [
+   "Object127"
+  ],
+  "128": [
+   "Object128"
+  ],
+  "129": [
+   "Object129"
+  ],
+  "130": [
+   "Object130"
+  ],
+  "131": [
+   "Object131"
+  ],
+  "132": [
+   "Object132"
+  ],
+  "133": [
+   "Object133"
+  ],
+  "134": [
+   "Object134"
+  ],
+  "135": [
+   "Object135"
+  ],
+  "136": [
+   "Object136"
+  ],
+  "137": [
+   "Object137"
+  ],
+  "138": [
+   "Object138"
+  ],
+  "139": [
+   "Object139"
+  ],
+  "140": [
+   "Object140"
+  ],
+  "141": [
+   "Object141"
+  ],
+  "142": [
+   "Object142"
+  ],
+  "143": [
+   "Object143"
+  ],
+  "144": [
+   "Object144"
+  ],
+  "145": [
+   "Object145"
+  ],
+  "146": [
+   "Object146"
+  ],
+  "147": [
+   "Object147"
+  ],
+  "148": [
+   "Object148"
+  ],
+  "149": [
+   "Object149"
+  ],
+  "150": [
+   "Object150"
+  ],
+  "151": [
+   "Object151"
+  ],
+  "152": [
+   "Object152"
+  ],
+  "153": [
+   "Object153"
+  ],
+  "154": [
+   "Object154"
+  ],
+  "155": [
+   "Object155"
+  ],
+  "157": [
+   "Object157"
+  ],
+  "158": [
+   "Object158"
+  ],
+  "159": [
+   "Object158"
+  ],
+  "160": [
+   "Object160"
+  ],
+  "161": [
+   "Object161"
+  ],
+  "162": [
+   "Object162"
+  ],
+  "163": [
+   "Object163"
+  ],
+  "164": [
+   "Object164"
+  ],
+  "165": [
+   "Object165"
+  ],
+  "166": [
+   "Object166"
+  ],
+  "167": [
+   "Object166"
+  ],
+  "168": [
+   "Object168"
+  ],
+  "169": [
+   "Object169"
+  ],
+  "170": [
+   "Object170"
+  ],
+  "171": [
+   "Object171"
+  ],
+  "172": [
+   "Object172"
+  ],
+  "173": [
+   "Object173"
+  ],
+  "174": [
+   "Object174"
+  ],
+  "175": [
+   "Object175"
+  ],
+  "176": [
+   "Object176"
+  ],
+  "177": [
+   "Object177"
+  ],
+  "178": [
+   "Object178"
+  ],
+  "179": [
+   "Object179"
+  ],
+  "180": [
+   "Object180"
+  ],
+  "181": [
+   "Object181"
+  ],
+  "182": [
+   "Object182"
+  ],
+  "183": [
+   "Object183"
+  ],
+  "184": [
+   "Object184"
+  ],
+  "185": [
+   "Object185"
+  ],
+  "186": [
+   "Object186"
+  ],
+  "188": [
+   "Object188"
+  ],
+  "189": [
+   "Object189"
+  ],
+  "190": [
+   "Object190"
+  ],
+  "191": [
+   "Object191"
+  ],
+  "192": [
+   "Object192"
+  ],
+  "193": [
+   "Object193"
+  ],
+  "194": [
+   "Object194"
+  ],
+  "195": [
+   "Object195"
+  ],
+  "196": [
+   "Object196"
+  ],
+  "197": [
+   "Object197"
+  ],
+  "198": [
+   "Object198"
+  ],
+  "199": [
+   "Object199"
+  ],
+  "200": [
+   "Object200"
+  ],
+  "201": [
+   "Object201"
+  ],
+  "202": [
+   "Object202"
+  ],
+  "203": [
+   "Object203"
+  ],
+  "204": [
+   "Object204"
+  ],
+  "205": [
+   "Object205"
+  ],
+  "206": [
+   "Object206"
+  ],
+  "207": [
+   "Object207"
+  ],
+  "208": [
+   "Object208"
+  ],
+  "209": [
+   "Object209"
+  ],
+  "210": [
+   "Object210"
+  ],
+  "211": [
+   "Object211"
+  ],
+  "212": [
+   "Object212"
+  ],
+  "213": [
+   "Object213"
+  ],
+  "214": [
+   "Object214"
+  ],
+  "215": [
+   "Object215"
+  ],
+  "216": [
+   "Object216"
+  ],
+  "217": [
+   "Object217"
+  ],
+  "218": [
+   "Object218"
+  ],
+  "219": [
+   "Object219"
+  ],
+  "220": [
+   "Object220"
+  ],
+  "221": [
+   "Object221"
+  ],
+  "222": [
+   "Object222"
+  ],
+  "223": [
+   "Object223"
+  ],
+  "224": [
+   "Object224"
+  ],
+  "225": [
+   "Object225"
+  ],
+  "226": [
+   "Object226"
+  ],
+  "227": [
+   "Object227"
+  ],
+  "228": [
+   "Object228"
+  ],
+  "229": [
+   "Object229"
+  ],
+  "230": [
+   "Object230"
+  ],
+  "231": [
+   "Object231"
+  ],
+  "232": [
+   "Object232"
+  ],
+  "233": [
+   "Object233"
+  ],
+  "234": [
+   "Object234"
+  ],
+  "235": [
+   "Object235"
+  ],
+  "236": [
+   "Object236"
+  ],
+  "237": [
+   "Object237"
+  ],
+  "238": [
+   "Object238"
+  ],
+  "239": [
+   "Object239"
+  ],
+  "240": [
+   "Object240"
+  ],
+  "241": [
+   "Object241"
+  ],
+  "242": [
+   "Object242"
+  ],
+  "243": [
+   "Object243"
+  ],
+  "244": [
+   "Object244"
+  ],
+  "245": [
+   "Object245"
+  ],
+  "246": [
+   "Object246"
+  ],
+  "247": [
+   "Object247"
+  ],
+  "248": [
+   "Object248"
+  ],
+  "249": [
+   "Object249"
+  ],
+  "250": [
+   "Object250"
+  ],
+  "251": [
+   "Object251"
+  ],
+  "252": [
+   "Object252"
+  ],
+  "253": [
+   "Object253"
+  ],
+  "254": [
+   "SpinBlock"
+  ],
+  "255": [
+   "Object255"
+  ],
+  "256": [
+   "Object256"
+  ],
+  "257": [
+   "Object257"
+  ],
+  "258": [
+   "Object258"
+  ],
+  "259": [
+   "Object259"
+  ],
+  "260": [
+   "Object260"
+  ],
+  "261": [
+   "Object261"
+  ],
+  "262": [
+   "Object262"
+  ],
+  "263": [
+   "Object263"
+  ],
+  "264": [
+   "Object264"
+  ],
+  "265": [
+   "Object265"
+  ],
+  "266": [
+   "Object266"
+  ],
+  "267": [
+   "Object267"
+  ],
+  "268": [
+   "Object268"
+  ],
+  "269": [
+   "Object269"
+  ],
+  "270": [
+   "Object270"
+  ],
+  "271": [
+   "Object270"
+  ],
+  "272": [
+   "Object272"
+  ],
+  "273": [
+   "Object272"
+  ],
+  "274": [
+   "Object274"
+  ],
+  "275": [
+   "Object274"
+  ],
+  "276": [
+   "Object276"
+  ],
+  "277": [
+   "Object277"
+  ],
+  "278": [
+   "Object278"
+  ],
+  "279": [
+   "Object279"
+  ],
+  "280": [
+   "Object280"
+  ],
+  "281": [
+   "Object281"
+  ],
+  "282": [
+   "Object282"
+  ],
+  "283": [
+   "Object274"
+  ],
+  "284": [
+   "Object274"
+  ],
+  "285": [
+   "Object285"
+  ],
+  "286": [
+   "Object285"
+  ],
+  "301": [
+   "Object301"
+  ],
+  "302": [
+   "Object302"
+  ],
+  "303": [
+   "StageLayout"
+  ],
+  "304": [
+   "Object304"
+  ],
+  "305": [
+   "Object305"
+  ],
+  "306": [
+   "Object306"
+  ],
+  "307": [
+   "Object307"
+  ],
+  "308": [
+   "Object308"
+  ],
+  "309": [
+   "Object309"
+  ],
+  "310": [
+   "Object310"
+  ],
+  "311": [
+   "Object311"
+  ],
+  "312": [
+   "Object312"
+  ],
+  "313": [
+   "Object313"
+  ],
+  "314": [
+   "Object314"
+  ],
+  "315": [
+   "Object315"
+  ],
+  "317": [
+   "Object317"
+  ],
+  "318": [
+   "Object318"
+  ],
+  "323": [
+   "Object323"
+  ],
+  "324": [
+   "Object324"
+  ],
+  "325": [
+   "Object325"
+  ],
+  "326": [
+   "Object326"
+  ],
+  "327": [
+   "Object327"
+  ],
+  "328": [
+   "Object328"
+  ],
+  "330": [
+   "Object330"
+  ],
+  "331": [
+   "Object331"
+  ],
+  "332": [
+   "Object332"
+  ],
+  "333": [
+   "Object333"
+  ],
+  "334": [
+   "Object334"
+  ],
+  "335": [
+   "Object335"
+  ],
+  "336": [
+   "Object336"
+  ],
+  "337": [
+   "Object337"
+  ],
+  "339": [
+   "Object339"
+  ],
+  "340": [
+   "Object340"
+  ],
+  "341": [
+   "Object341"
+  ],
+  "342": [
+   "Object342"
+  ],
+  "343": [
+   "Object343"
+  ],
+  "344": [
+   "Object344"
+  ],
+  "345": [
+   "Object345"
+  ],
+  "346": [
+   "Object346"
+  ],
+  "347": [
+   "Object347"
+  ],
+  "348": [
+   "Object348"
+  ],
+  "349": [
+   "Object349"
+  ],
+  "350": [
+   "Object350"
+  ],
+  "351": [
+   "Object351"
+  ],
+  "352": [
+   "Object352"
+  ],
+  "353": [
+   "Object353"
+  ],
+  "354": [
+   "Object354"
+  ],
+  "355": [
+   "Object355"
+  ],
+  "356": [
+   "Object356"
+  ],
+  "357": [
+   "Object357"
+  ],
+  "358": [
+   "Object358"
+  ],
+  "359": [
+   "Object359"
+  ],
+  "360": [
+   "Object360"
+  ],
+  "361": [
+   "Object361"
+  ],
+  "362": [
+   "Object362"
+  ],
+  "363": [
+   "Object363"
+  ],
+  "364": [
+   "Object364"
+  ],
+  "365": [
+   "Object365"
+  ],
+  "366": [
+   "Object366"
+  ],
+  "367": [
+   "Object367"
+  ],
+  "368": [
+   "Object368"
+  ],
+  "369": [
+   "Object369"
+  ],
+  "370": [
+   "Object370"
+  ],
+  "371": [
+   "Object371"
+  ],
+  "372": [
+   "Object372"
+  ],
+  "373": [
+   "Object373"
+  ],
+  "374": [
+   "Object374"
+  ],
+  "375": [
+   "Object375"
+  ],
+  "376": [
+   "Object376"
+  ],
+  "377": [
+   "Object377"
+  ],
+  "378": [
+   "Object378"
+  ],
+  "379": [
+   "Object379"
+  ],
+  "380": [
+   "Object380"
+  ],
+  "381": [
+   "Object381"
+  ],
+  "382": [
+   "Object382"
+  ],
+  "383": [
+   "Object383"
+  ],
+  "384": [
+   "Object384"
+  ]
+ },
+ "slot_comment_conflicts": [],
+ "max_id": 384
+}

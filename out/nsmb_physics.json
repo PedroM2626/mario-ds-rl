@@ -1,0 +1,70 @@
+{
+  "source": "ref/nsmb-decomp (CC0 clean-room decompilation, early stage -- not all actors decompiled)",
+  "extracted": "2026-09-23",
+  "units": {
+    "position_and_velocity_fixed_point": "0x1000 == 1 pixel (12 fractional bits)",
+    "evidence": [
+      "src/AAA.hpp:17  _FixedFlt(flt) ((i32)(flt * 4096.0))",
+      "src/AAA.hpp:19-23  _FixedMul shifts by 12",
+      "src/Bases/StageEntity.cpp:100-101  viewOffset.x << 0xc  (pixels -> world units)",
+      "src/Bases/Coin.cpp:650 sets viewOffset.y = 8 while :705 offsets the sprite by 0x8000 (8 px == 0x8000)",
+      "src/Bases/Coin.cpp:517-518 shifts by 0x8000 (half tile) and 0x10000 (tile) => 1 tile = 16 px = 0x10000"
+    ],
+    "note": "An earlier revision of this project used 16.16 (0x10000 per pixel). That was wrong by 16x and is corrected here.",
+    "tile_px": 16,
+    "fps": 60,
+    "accel_sign": "positive velocity.y is UP (src/Bases/manhole.cpp:370-377 tests player.velocity.y > 0 to mean jumping), so gravity is negative and minVelocity.y is the floor."
+  },
+  "integration_model": {
+    "updateVerticalVelocity": {
+      "src": "src/Bases/Actor.cpp:225-234",
+      "rule": "velocity.y = max(velocity.y + accelV, minVelocity.y)",
+      "meaning": "minVelocity.y is a ONE-SIDED lower clamp: it is terminal fall speed and does not limit upward motion."
+    },
+    "updateHorizontalVelocity": {
+      "src": "src/Bases/Actor.cpp:210-223",
+      "rule": "velocity.x moves toward minVelocity.x in steps of accelH, snapping on overshoot",
+      "meaning": "minVelocity.x is an asymptotic TARGET speed, not a limit. Zero callers in src/."
+    },
+    "applyVelocityToPosition": {
+      "src": "src/Bases/Actor.cpp:184-200",
+      "rule": "position += applyAcceleration(velocity)",
+      "meaning": "no clamping here."
+    },
+    "applyAcceleration": {
+      "src": "src/Bases/Actor.cpp:150-182",
+      "rule": "per axis, clamp velocity + acceleration to +-velocitylimit",
+      "meaning": "velocitylimit caps the integration STEP, and the clamped value is never written back to velocity. Default +-0x8000 = 32 px/frame, set once in the Actor ctor (src/Bases/Actor.cpp:52-54) and never overridden in src/."
+    },
+    "stepVelocityClamped": {
+      "src": "src/Bases/Actor.cpp:236-287",
+      "rule": "second, separate clamp family using scalar velH/minVelH/accelV/minVelV, treating them as a two-sided attractor",
+      "meaning": "zero callers and zero writers in src/ today. Listed so it is not mistaken for the live path."
+    }
+  },
+  "constants": [
+    {"field": "accelV", "class": "StageEntity (default for every level entity)", "raw": "-0x300", "px_per_f2": -0.1875, "px_per_s2": -675.0, "src": "src/Bases/StageEntity.cpp:13"},
+    {"field": "minVelocity.y", "class": "StageEntity", "raw": "-0x4000", "px_per_f": -16.0, "px_per_s": -960.0, "src": "src/Bases/StageEntity.cpp:15"},
+    {"field": "accelV", "class": "StageEntity::stopVelocity", "raw": "0", "px_per_f2": 0.0, "src": "src/Bases/StageEntity.cpp:194"},
+    {"field": "accelV", "class": "StageEntity::_18 (shell/attach enter)", "raw": "-0x300", "px_per_f2": -0.1875, "src": "src/Bases/StageEntity.cpp:322"},
+    {"field": "accelH", "class": "StageEntity::_18", "raw": "0x100", "px_per_f2": 0.0625, "src": "src/Bases/StageEntity.cpp:321", "note": "the only non-zero accelH in the repository"},
+    {"field": "accelV", "class": "Coin (state via func_ov010_020d923c)", "raw": "-0x280", "px_per_f2": -0.15625, "px_per_s2": -562.5, "src": "src/Bases/Coin.cpp:256", "condition": "this->_4e4 == 0 (first frame of the state)"},
+    {"field": "minVelocity.y", "class": "Coin", "raw": "-0x8000", "px_per_f": -32.0, "src": "src/Bases/Coin.cpp:254"},
+    {"field": "accelV", "class": "Coin (state via func_ov010_020d8d9c)", "raw": "-0x300", "px_per_f2": -0.1875, "src": "src/Bases/Coin.cpp:392", "condition": "_4e4 == 0"},
+    {"field": "accelV", "class": "Coin (state via func_ov010_020d8b9c)", "raw": "-0x280", "px_per_f2": -0.15625, "src": "src/Bases/Coin.cpp:436", "condition": "_4e4 == 0"},
+    {"field": "accelV", "class": "Manhole", "raw": "0", "px_per_f2": 0.0, "src": "src/Bases/manhole.cpp:55", "note": "floating gate: no gravity"},
+    {"field": "velocity.y", "class": "StageEntity::_36", "raw": "0x2000", "px_per_f": 8.0, "src": "src/Bases/StageEntity.cpp:186"},
+    {"field": "gravity_multiplier", "class": "PlayerBase, POWERUP_MINI", "raw": "_FixedMul(gravity, 0xD00)", "factor": 0.8125, "src": "src/Bases/Player/PlayerBase.cpp:1102-1113", "note": "scales whatever the base gravity is; the base value and the caller are NOT in this repository"}
+  ],
+  "unknown": {
+    "player_gravity": "Not in the decompilation. The Player hierarchy (PlayerBase : StageActor : Actor : Object) never assigns accelV, minVelocity or velocitylimit, so player gravity is not expressed through the Actor gravity fields at all -- it lives in the player's own movement routine, which is not decompiled yet.",
+    "player_jump": "No jump velocity, no button-hold logic, no apex/hang-time and no per-jump-state branching exists anywhere in src/. Grep for 'jump' returns only a Manhole sensor flag, a minigame name string and a worldmap SFX enum. The candidate tables at src/Bases/Player/PlayerBase.cpp:4-6 (+-0x3000/0x3800/0x4000 = 12/14/16 px, selected by powerup) are NOT confirmed as jump velocities: the function has no caller in src/ and its type is i16 while velocities are i32. Do not use them as jump power.",
+    "per_species_gravity": "Only StageEntity (default), Coin and Manhole are evidenced. ~300 actor classes are one-line stubs; their gravity is inherited from the StageEntity default unless they override it in code that has not been decompiled. Absence here is unknown, not zero.",
+    "level_record_layout": "Not represented in this source: src/Bases/StageEntity.cpp contains no file reading and no record loop, and the course section FourCCs (ENRT/SPAW/LVTL/...) occur nowhere in src/, tools/ or lib/. The class that would own it, StageLayout, is a 0xa8f4-byte stub (src/Bases/stubs/StageLayout.hpp:11-19)."
+  },
+  "actor_identity": {
+    "mechanism": "CurrentProfileTable[object_id]->constructor()  (src/Bases/Base.cpp:185-186, src/Bases/Base.cpp:526)",
+    "table": "out/nsmb_object_ids.json -- 342 ids recovered by pairing each 'ActorProfile X_Profile = { Class::create, <id>, <render>, ... }' definition with its '// MainProfileTable slot N | ovMMM | profile @ ADDR' header comment",
+    "validation": "320 of 342 cross-checked against the comment's slot with zero disagreements; 22 have no comment; no id is claimed by two classes. Coverage is partial: Goomba, Koopa and Piranha Plant have no profile line in this checkout."
+  }
+}
