@@ -129,51 +129,39 @@ Listed in priority order for advancing the ML goal (clearing 1-1 or reaching a p
 
 ---
 
-## 3. Recommended Next Steps (ordered)
+## 3. Current Research Status & Next Steps (ordered)
 
-### Step 1 — Fix level-finish detection (P0, ≈ 30 min)
+### Completed Milestones ✅
+1. **Level-Finish Detection:** Hardware stage clear flag isolated at `CLEAR_FLAG_ADDR = 0x020DCF27` (transitions $0 \to 1$ on flagpole descent / castle entry).
+2. **Dataset Export:** 191 stages parsed and normalized into [`out/dataset/levels.jsonl`](../out/dataset/levels.jsonl) and [`out/dataset/entities.csv`](../out/dataset/entities.csv) with corrected 20.12 fixed-point coordinate scaling.
+3. **PINN & Policy Retraining:** $25\times$ death loss weighting + grounded physical collision hitbox mortality integrated into imagination.
+4. **Academic Documentation:** Added [`docs/REVERSE_ENGINEERING_REPORT.md`](REVERSE_ENGINEERING_REPORT.md), [`docs/MODEL_CARDS.md`](MODEL_CARDS.md), and [`docs/BENCHMARK_PROTOCOL.md`](BENCHMARK_PROTOCOL.md).
 
-```python
-# In src/ram_state.py — add:
-CLEAR_FLAG_ADDR = None  # TBD — scan 0x021C0000:0x021E0000 before/after flag-pole touch
-```
+### Outstanding Research Problems 🔬
 
-Run differential search manually: load savestate → walk to flag → dump RAM → diff with pre-flag snapshot → filter for single-bit transitions (0→1 or N→0). This unlocks the +100 terminal reward.
+#### Priority 1 — Overcoming the 1,498 px Barrier in MPC
+* **Finding:** Closed-loop CEM-MPC consistently clears the initial Goomba ($336\text{ px}$) and the first tall green pipe ($384\text{ px}$), reaching up to $1,498.3\text{ px}$ (35% of World 1-1). However, at $X \approx 1,498\text{ px}$, the agent encounters another patrol Goomba on narrow terrain and suffers fatal collision.
+* **Next Action:** Extend the spatiotemporal planner lookahead horizon and incorporate velocity-adaptive takeoff positioning to prevent collision with secondary Goombas.
 
-### Step 2 — Export all 382 levels to JSON (P2/P3, ≈ 1 hr including validation)
+#### Priority 2 — Resolving Pipe Collision in PPO+Reflex
+* **Finding:** While the hazard reflex correctly detects the Goomba at $X \approx 336\text{ px}$, initiating a leap at $X \approx 358\text{ px}$ causes Mario to collide horizontally with the 3-tile-tall green pipe at $X = 384\text{ px}$. This collision cancels forward momentum and drops Mario directly onto the Goomba patrol path.
+* **Next Action:** Add preemptive terrain geometry awareness to `ReflexivePPOAgent` so it jumps *before* entering the pipe deceleration zone.
 
-Create `src/export_levels.py`:
-```bash
-python src/export_levels.py --output evals/levels_all.json
-```
-Output: per-level dict with `{name, sprites: [{id, x_tile, y_tile, data}], bgdat: [{obj, x, y, w, h}], entrances: [...]}`. This is the static dataset for training level-conditioned models.
-
-### Step 3 — Fix PPO deterministic death loop (P0, ≈ 2 hrs)
-
-Debug: add `--debug-obs` flag to `eval_pinn_realtime.py` to print the obs vector at each step, specifically `etype0` and `edx0` at step 36 (the death step). Verify the enemy is visible in the observation before death. If the PINN imagination didn't include this Goomba configuration, add targeted replay of that transition segment.
-
-### Step 4 — Enemy-aware planner (P1/P2, ≈ 3 hrs)
-
-Extend `TilemapAStar.plan()` to receive current enemy positions from `RamState` and add a time-penalized soft obstacle at each enemy's tile column. Re-run MPC eval to check whether the 1730 px wall is broken.
-
-### Step 5 — Increase PINN transition pool & reduce drift (P1, ≈ 2 hrs training)
-
-```bash
-python src/train_pinn_world_model.py --transitions 10000 --epochs 300
-```
-Validate: open-loop drift should drop below 800 px. If drift persists, add GRU recurrent head to `MarioPINNWorldModel`.
+#### Priority 3 — Player Jump State Machine Decomposition (Disassembly Route B)
+* **Status:** Still an open gap in static reverse engineering. Complete empirical vertical trajectory fitting using `bridge/capture_jump.py` under standing vs. running leaps to formalize the exact player jump curve.
 
 ---
 
-## 4. Eval Summary Table
+## 4. Empirical Evaluation Summary Table
 
-| Controller | Mean progress (px) | Max progress (px) | Clear rate | Notes |
-|---|---|---|---|---|
-| PPO (Dyna, 200 k steps) | 347 | 424 | 0% | Deterministic Goomba death loop |
-| Reactive (rule-based) | 484 | 561 | 0% | Truncation at 1000 steps |
-| Reactive (PINN obs, n=4) | 1137 | 1203 | 0% | Consistent Goomba deaths |
-| CEM-MPC (PINN, n=8) | 1269 | 1730 | 0% | Best; blocked at pit+Goomba at 1730 px |
-| **Goal** | **4256** | — | 100% | Flag-pole position 1-1 |
+| Controller | Mean Progress (px) | Max Progress (px) | Clear Rate | Notes |
+|---|:---:|:---:|:---:|---|
+| **CEM-MPC (PINN, n=5)** | **1,025.8** | **1,498.3** | **0.0%** | Clears initial Goomba & pipe; dies at secondary Goomba at 1498 px |
+| **PPO+Reflex (PINN, n=5)** | 375.6 | 446.0 | 0.0% | Leaps over Goomba but collides with pipe wall at 384 px |
+| **Reactive (Rule-based, n=4)** | 1,136.7 | 1,202.7 | 0.0% | Rule-based hazard leaps; dies at 1115-1203 px |
+| **PPO Pure (Pixels, n=10 det)** | 120.8 | 120.8 | 0.0% | Deterministic Goomba death loop at entrance |
+| **Goal (Flagpole)** | **4,032.0** | **4,256.0** | **100%** | Flagpole contact & castle entrance (World 1-1) |
+
 
 ---
 

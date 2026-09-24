@@ -248,6 +248,7 @@ Direct memory variable extraction via `emu.memory` (`src/ram_state.py`, discover
 | `RamState.enemies()` | `[{type, dx, dy}]` in px — Goomba verified: 164px $\rightarrow$ contact $\rightarrow$ life lost | ✅ Verified |
 | `0x020DC968` u32 | Stage timer in 20.12 fixed point (398.3 HUD equivalent) | ✅ Verified |
 | `0x021C1908` s32 | Vertical velocity Y-vel (0.0 on ground, parabolas during jump) | ✅ Verified |
+| `0x020DCF27` u8 | Stage Clear Flag (transitions 0 -> 1 on flagpole descent / castle entry) | ✅ Verified |
 | `0x020A703C` u32 | Complementary vertical position | 🧪 Experimental |
 
 **Validation (RAM Telemetry vs Optical Flow):** Across identical 39-step rollouts, accumulated progress correlation is **0.91**, verifying the `RAM_PX_PER_UNIT = 1/4096` scaling factor. Death detection via RAM lives occurs **3 frames earlier** than pixel template matching (which triggers on the black game-over screen).
