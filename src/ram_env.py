@@ -117,8 +117,13 @@ class MarioRamEnv(gym.Env):
         if self.has_emulator:
             self.emu.savestate.load_file(self.state_path)
             self.ram.reset()
+            for k in [Keys.KEY_RIGHT, Keys.KEY_LEFT, Keys.KEY_A, Keys.KEY_B, Keys.KEY_X, Keys.KEY_Y, Keys.KEY_UP, Keys.KEY_DOWN]:
+                self.emu.input.keypad_rm_key(keymask(k))
         self._x0 = self._y0 = None
         self.episode_steps = 0
+        self._prev_keys = set()
+        self._last_on_ground = True
+        self._just_landed = False
         obs, _ = self._observe()
         # Origin fixed after first poll
         return obs, {}
@@ -139,13 +144,35 @@ class MarioRamEnv(gym.Env):
 
     def step(self, action):
         keys = self._action_keys(action)
+        prev_keys = getattr(self, "_prev_keys", set())
+
+        # If repeating a jump action while grounded or upon touchdown, release KEY_A for 1 cycle to generate a hardware rising edge
+        is_jump = (Keys.KEY_A in keys)
+        was_jump = (Keys.KEY_A in prev_keys)
+        grounded = getattr(self, "_last_on_ground", False) or getattr(self, "_just_landed", False)
+        if is_jump and was_jump and grounded:
+            # 1 cycle with directional/dash keys but without KEY_A
+            for k in [k for k in keys if k != Keys.KEY_A]:
+                self.emu.input.keypad_add_key(keymask(k))
+            self.emu.cycle()
+            for k in [k for k in keys if k != Keys.KEY_A]:
+                self.emu.input.keypad_rm_key(keymask(k))
+            skip = max(1, self.frameskip - 1)
+        else:
+            skip = self.frameskip
+
         for key in keys:
             self.emu.input.keypad_add_key(keymask(key))
-        for _ in range(self.frameskip):
+        for _ in range(skip):
             self.emu.cycle()
         for key in keys:
             self.emu.input.keypad_rm_key(keymask(key))
+
+        self._prev_keys = set(keys)
         obs, st = self._observe()
+        on_ground = (obs[4] > 0.5)
+        self._just_landed = (not getattr(self, "_last_on_ground", False) and on_ground)
+        self._last_on_ground = on_ground
         reward = st["progress"] / 4096.0 * 2.0 - 0.05
         done, trunc = False, False
         

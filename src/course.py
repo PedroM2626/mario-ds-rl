@@ -18,7 +18,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 TILE = 16
 # All solid surface objects from tileset (ground, grass, slopes, edges, stairs, pipes)
 # 0x0A: ground, 0x00: base, 0x09: grass top, 0x06-0x08: slopes/edges, 0x0D: stairs,
-# 0x2C (44) & 0x30 (48): warp pipes (0x14 are overhead question/brick blocks, not floor)
 GROUND_OBJS = (0x00, 0x01, 0x02, 0x03, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0D, 0x0E, 0x0F, 0x2C, 0x30)
 
 import json

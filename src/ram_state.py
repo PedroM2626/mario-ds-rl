@@ -204,5 +204,6 @@ class RamState:
         self.acc_cam = 0.0
         self.max_acc = 0.0
         self.prev_lives = None
+        self.deaths = 0
+        self.mario_base = None
         self.prev_enemies = {}
-        # mario_base persists (same savestate => identical memory layout); rediscover on failure

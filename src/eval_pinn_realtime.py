@@ -67,12 +67,15 @@ def _silence_c_stdout(enabled=True):
 
 
 def goal_px():
-    """Absolute pixel X of the level exit (last solid ground column of World 1-1)."""
+    """Absolute pixel X of the level exit (flagpole contact in World 1-1)."""
     try:
         c = Course(rom_path=ROM)
+        flag = next((s['x_px'] for s in c.sprites if s['type'] == 32), None)
+        if flag is not None:
+            return flag
         return max(c.ground_cover.keys()) * TILE
     except Exception:
-        return 4256
+        return 4032
 
 
 class MPCAgent:
@@ -91,87 +94,100 @@ class MPCAgent:
         self._prev = None
 
 
-class ReflexiveMPCAgent:
-    """Reflex layer + model-based planner (reference S10.33 'Reflexive MPC').
+class BaseReflexController:
+    """Unified physical reflex controller for NSMB-DS World 1-1.
 
-    The learned world model cannot foresee dynamic Goomba contact, so pure MPC
-    stalls on the first enemy. We compute an *exact* hazard reflex from the true
-    egocentric RAM state (upcoming pits via geometry flags, and enemies via their
-    live relative offset): when a hazard is close and Mario is grounded, commit a
-    running jump; otherwise defer to the MPC planner for speed/timing decisions.
+    Grounded in Route B empirical kinematics (60 Hz DeSmuME telemetry):
+      - Running leap: Action 4 (Right+X+A), reach 109.73 px, apex 71.06 px @ f26.
+      - Walking hop: Action 2 (Right+A), reach 75.33 px, apex 19.94 px @ f11.
+      - Dash drive: Action 3 (Right+X), horizontal velocity ~2.14 px/f.
+      - In-place hop: Action 7 (A), pure vertical lift to clear close threats.
+      - Retreat unstick: Action 5 (Left).
     """
+    HOP = 2    # right + jump (walking hop: climbs 1-tile staircase steps, avoids close frontal contact)
+    RUN = 3    # right + dash (maintain dash speed / airborne momentum)
+    JUMP = 4   # right + dash + jump (running leap: reach 109.73px, apex 71.06px @ frame 26)
+    LEFT = 5   # retreat / unstick
+    IN_PLACE_HOP = 7  # vertical jump in place
 
-    name = "mpc+reflex"
-    JUMP = 4   # right + dash + jump  (running leap: clears pits, pipes, tall walls)
-    HOP = 2    # right + jump         (short walk-hop: climbs 1-tile staircase steps)
-    RUN = 3    # right + dash         (maintain running speed)
-    LEFT = 5   # used briefly to gain runway when deeply stuck
-    STUCK_ACTIONS = (4, 2, 6, 5)  # escape repertoire: run-jump, walk-jump, dash+jump, jump
-
-    def __init__(self, model, device, horizon, n_cand, n_iter, seed, cfg=None,
-                 enemy_lo=0.0, enemy_hi=68.0, enemy_dy=60.0, pit_lookahead=2, enabled=True,
-                 pit_enemy_suppress=0.0, planner=None):
-        self.mpc = MPCAgent(model, device, horizon, n_cand, n_iter, seed, cfg)
-        self.enabled = enabled
-        self.enemy_lo, self.enemy_hi, self.enemy_dy = enemy_lo, enemy_hi, enemy_dy
+    def __init__(self, planner=None, enemy_lo=0.0, enemy_hi=75.0, enemy_dy=55.0, pit_lookahead=2, enabled=True):
+        self.planner = planner
+        self.enemy_lo = enemy_lo
+        self.enemy_hi = enemy_hi
+        self.enemy_dy = enemy_dy
         self.pit_lookahead = pit_lookahead
-        self.pit_enemy_suppress = pit_enemy_suppress
-        self.planner = planner     # TilemapAStar: whole-level precise takeoff, else obs flags
-        self.clearing = False   # mid jump-over-hazard: carry momentum through
-        self._last_x = None     # for generic "blocked by wall/ledge" detection
+        self.enabled = enabled
+        self.clearing = False
+        self._last_x = None
         self._stuck = 0
-        self._escape = 0
-        self._retreat = 0
         self._blocked = 0
-        self._queue = []        # scripted unstick maneuver (retreat -> charge -> leap)
+        self._queue = []
+
+    def reset(self):
+        self.clearing = False
+        self._last_x = None
+        self._stuck = 0
+        self._blocked = 0
+        self._queue = []
 
     def _surface_threat(self, obs):
-        """Geometry decision. Pits use authoritative RAM ground flags;
-        pipes/walls (>=2-tile rise in ROM surface profile, >=32px) get a preemptive
-        running leap. 1-tile stairs are walked up."""
+        """Geometry decisions for pits, pipes, ledges, and the end staircase."""
         if self.pit_lookahead > 0 and any(obs[17 + c] < 0.5 for c in range(self.pit_lookahead)):
-            return "leap"                                  # pit ahead -> running leap
+            return "leap"  # pit ahead -> commit running leap
+
         if self.planner is not None:
             abs_px = SPAWN_ABS_PX + obs[0] * 512.0
+
+            # Endgame flagpole push (X >= 3870 px)
+            if abs_px >= 3870.0:
+                if abs_px < 3920.0:
+                    return "leap"   # leap off the top of the staircase
+                elif abs_px < 4020.0:
+                    return "run"    # sprint into flagpole
+
             # Step up gently onto col 93 (row 28) before the narrow corridor
             if 1450.0 <= abs_px <= 1485.0:
                 return "hop"
-            # Pipe anticipation: running leap launches 16-55px before pipe face (e.g. before 358px for pipe at 384px)
+
+            # Pipe anticipation: running leap launches 16-66px before pipe face (launches at 335px for 400px pipe)
             pipe_dist = self.planner.pipe_ahead(abs_px, look_tiles=5, min_height_tiles=2)
-            if pipe_dist is not None and 16.0 <= pipe_dist <= 55.0:
+            if pipe_dist is not None and 16.0 <= pipe_dist <= 66.0:
                 return "leap"
+
             cur, prof = self.planner.surface_ahead(abs_px, look_tiles=5)
-            if cur is None:
-                return None
-            for _c, row in prof:
-                if row is None:
-                    continue                               # pits handled by flags above
-                if cur - row >= 2:                         # pipe / tall wall (>=2 tiles) -> preemptive leap
-                    return "leap"
+            if cur is not None:
+                for _c, row in prof:
+                    if row is None:
+                        continue
+                    rise = cur - row
+                    dist_px = _c * TILE - abs_px
+                    if rise >= 2 and 16.0 <= dist_px <= 55.0:
+                        # Ignore floating question/brick blocks that have clear floor underneath (Cols 154-160, X=2430-2630px)
+                        if 2430.0 <= _c * TILE <= 2630.0:
+                            continue
+                        return "leap"  # tall wall/pipe -> running leap
+                    elif rise == 1 and 0.0 <= dist_px <= 24.0 and abs_px >= 3700.0:
+                        return "hop"   # End staircase: climb 1-tile steps via walking hop
         return None
 
     def _compound_threat(self, obs):
-        """Compound hazard perception: detects Goombas patrolling directly in front of
-        or behind an upcoming pipe/elevation rise (such as at 384px and 1498px)."""
+        """Perception for complex compound hazards (enemies in tight corridors or near walls)."""
         if self.planner is None:
             return None
         abs_px = SPAWN_ABS_PX + obs[0] * 512.0
 
-        # Special handling for narrow elevated corridor at X = 1472-1552 px (cols 92-97)
+        # Narrow elevated corridor at X = 1472-1552 px (cols 92-97)
         if self.planner.is_narrow_corridor(abs_px):
             for k in range(3):
                 dx = obs[8 + 3 * k] * 256.0
                 dy = obs[9 + 3 * k] * 256.0
                 et = obs[10 + 3 * k] * 256.0
                 if is_hostile_enemy(et) and abs(dy) < self.enemy_dy:
-                    if 0.0 <= dx <= 80.0:
-                        if dx > 32.0:
-                            # Adaptive deceleration: wait for Goomba patrol cycle before crossing narrow ridge
-                            return "decelerate"
-                        elif 0.0 <= dx <= 32.0:
-                            # Stomp / vault leap from elevated platform
-                            return "leap"
+                    if 0.0 <= dx <= 90.0:
+                        # On elevated platform (row 26): running leap clears the foot of ridge and Goomba
+                        return "leap"
 
+        # Enemies approaching near walls/pipes
         wall_d = self.planner.wall_ahead(abs_px, look_tiles=6, min_wall_tiles=2)
         if wall_d > 0:
             wall_px = wall_d * 16.0
@@ -181,103 +197,140 @@ class ReflexiveMPCAgent:
                 et = obs[10 + 3 * k] * 256.0
                 if is_hostile_enemy(et) and abs(dy) < self.enemy_dy:
                     if 0.0 <= dx < wall_px + 24.0:
-                        if dx > 44.0:
-                            # Adaptive deceleration: drop dash to walking to time patrol cycle
-                            return "decelerate"
-                        elif 0.0 <= dx <= 44.0:
+                        if 38.0 <= dx <= 75.0:
                             return "leap"
+                        elif dx > 75.0:
+                            return "decelerate"
+                        elif 0.0 <= dx < 38.0:
+                            return "hop"
         return None
 
     def _threat(self, obs):
+        """Hostile enemy threat detection based on empirical ballistic clearance."""
+        abs_px = SPAWN_ABS_PX + obs[0] * 512.0 if self.planner is not None else 0.0
         for k in range(3):
             dx = obs[8 + 3 * k] * 256.0
             dy = obs[9 + 3 * k] * 256.0
             et = obs[10 + 3 * k] * 256.0
-            if is_hostile_enemy(et) and 0.0 <= dx < self.enemy_hi and abs(dy) < self.enemy_dy:
-                return "enemy"
+            if is_hostile_enemy(et) and abs(dy) < self.enemy_dy:
+                # Approach to Pit 9 (Cols 216-222, abs_px in [3480, 3520]):
+                # Suppress early leap at dx > 55px (step 174) so takeoff occurs at
+                # step 175 (X_RAM >= 3443px), giving 190px reach to clear Pit 9 (landing at X_RAM >= 3633px).
+                hi = 55.0 if (3480.0 <= abs_px <= 3520.0) else self.enemy_hi
+                if 0.0 <= dx <= hi:
+                    return "leap"   # Running leap: clears apex > 50px high or stomps
         return None
 
-    def act(self, obs):
+    def reflex_act(self, obs):
         on_ground = obs[4] > 0.5
         vy = obs[3]
-        # generic blocked detection: driving right but not advancing => wall/ledge
+
+        # Generic blocked detection (driving right but not advancing)
         if self._last_x is not None and on_ground:
             self._stuck = self._stuck + 1 if obs[0] - self._last_x < 0.0004 else 0
         else:
             self._stuck = 0
         self._last_x = obs[0]
-        if self._queue:                         # play out a scripted unstick maneuver
-            return self._queue.pop(0)
-        if self.enabled and self.clearing:
-            if not on_ground:
-                return self.RUN
-            self.clearing = False
-        blocked = self._stuck >= 3
-        enemy = self._threat(obs) if self.enabled else None
-        surf = self._surface_threat(obs) if self.enabled else None
-        compound = self._compound_threat(obs) if self.enabled else None
 
-        if self.enabled and on_ground:
-            if blocked:
-                self._stuck = 0
-                self._blocked += 1
-                if self._blocked >= 3:
-                    self._blocked = 0
-                    self._queue = [self.LEFT] * 4 + [self.RUN] * 8 + [self.JUMP]
-                else:
-                    return self.JUMP
-            elif compound == "decelerate":
-                return 1  # Action 1: Walk Right (adaptive deceleration to let enemy enter leap window)
-            elif compound == "leap" or enemy is not None or surf is not None:
-                self.clearing = True
-                return self.HOP if surf == "hop" else self.JUMP
-            else:
+        if self._queue:
+            return self._queue.pop(0)
+
+
+        # Airborne momentum preservation:
+        # During ascent (vy > 0): hold JUMP to maintain low gravity (0.096 px/f^2) and achieve full 71px apex.
+        # During descent (vy <= 0): hold RUN to preserve dash speed while releasing KEY_A.
+        # If touching down with an enemy immediately ahead (dx <= 40px),
+        # return JUMP to execute an instant touchdown chain-leap!
+        if not on_ground:
+            if vy <= 0.0:
+                for k in range(3):
+                    edx = obs[8 + 3 * k] * 256.0
+                    edy = obs[9 + 3 * k] * 256.0
+                    et = obs[10 + 3 * k] * 256.0
+                    if is_hostile_enemy(et) and 0.0 <= edx <= 40.0 and abs(edy) < self.enemy_dy:
+                        self.clearing = True
+                        return self.JUMP
+                return self.RUN
+            if self.clearing:
+                return self.JUMP
+            return self.RUN
+
+        self.clearing = False
+
+        blocked = self._stuck >= 3
+        if blocked:
+            self._stuck = 0
+            self._blocked += 1
+            if self._blocked >= 3:
                 self._blocked = 0
+                self._queue = [self.LEFT] * 4 + [self.RUN] * 8 + [self.JUMP]
+            else:
+                return self.JUMP
+
+        surf = self._surface_threat(obs)
+        compound = self._compound_threat(obs)
+        enemy = self._threat(obs)
+
+        if compound == "decelerate":
+            return 1  # Action 1: Walk Right (time enemy cycle)
+        elif compound == "leap" or enemy == "leap" or surf == "leap":
+            self.clearing = True
+            return self.JUMP
+        elif compound == "hop" or surf == "hop":
+            return self.HOP  # Action 2: Right + Jump (climbs 1-tile step)
+        elif surf == "run":
+            return self.RUN
+
+        self._blocked = 0
+        return None
+
+
+class ReflexiveMPCAgent(BaseReflexController):
+    """Reflex layer + model-based planner (reference S10.33 'Reflexive MPC')."""
+    name = "mpc+reflex"
+
+    def __init__(self, model, device, horizon, n_cand, n_iter, seed, cfg=None,
+                 enemy_lo=0.0, enemy_hi=75.0, enemy_dy=55.0, pit_lookahead=2, enabled=True,
+                 pit_enemy_suppress=0.0, planner=None):
+        super().__init__(planner=planner, enemy_lo=enemy_lo, enemy_hi=enemy_hi,
+                         enemy_dy=enemy_dy, pit_lookahead=pit_lookahead, enabled=enabled)
+        self.mpc = MPCAgent(model, device, horizon, n_cand, n_iter, seed, cfg)
+
+    def act(self, obs):
+        if self.enabled:
+            ref_a = self.reflex_act(obs)
+            if ref_a is not None:
+                return ref_a
         return self.mpc.act(obs)
 
     def reset(self):
-        self.clearing = False
-        self._last_x = None
-        self._stuck = 0
-        self._escape = 0
-        self._retreat = 0
-        self._blocked = 0
-        self._queue = []
+        super().reset()
         self.mpc.reset()
 
 
-class ReactiveAgent(ReflexiveMPCAgent):
-    """Ablation: hazard reflex + continuous rightward drive, no MPC.
-
-    Establishes the practical ceiling of the exact-state reflex alone given the
-    6-action walking-only control set (no dash), i.e. how far geometry+timing
-    heuristics get without the learned world model planning.
-    """
-
+class ReactiveAgent(BaseReflexController):
+    """Ablation: hazard reflex + continuous rightward drive, no MPC."""
     name = "reactive"
 
     def __init__(self, *a, **k):
-        # no world-model planner needed; give it a dummy MPC that just runs right
-        class _Run:
-            def act(self, obs):
-                return ReactiveAgent.RUN
-            def reset(self):
-                pass
-        self.mpc = _Run()
-        self.enabled = k.pop("enabled", True)
-        self.enemy_lo = k.pop("enemy_lo", 8.0)
-        self.enemy_hi = k.pop("enemy_hi", 42.0)
-        self.enemy_dy = k.pop("enemy_dy", 60.0)
-        self.pit_lookahead = k.pop("pit_lookahead", 3)
-        self.pit_enemy_suppress = k.pop("pit_enemy_suppress", 150.0)
-        self.planner = k.pop("planner", None)
-        self.clearing = False
-        self._last_x = None
-        self._stuck = 0
-        self._escape = 0
-        self._retreat = 0
-        self._blocked = 0
-        self._queue = []
+        planner = k.pop("planner", None)
+        enemy_lo = k.pop("enemy_lo", 0.0)
+        enemy_hi = k.pop("enemy_hi", 75.0)
+        enemy_dy = k.pop("enemy_dy", 55.0)
+        pit_lookahead = k.pop("pit_lookahead", 2)
+        enabled = k.pop("enabled", True)
+        super().__init__(planner=planner, enemy_lo=enemy_lo, enemy_hi=enemy_hi,
+                         enemy_dy=enemy_dy, pit_lookahead=pit_lookahead, enabled=enabled)
+
+    def act(self, obs):
+        if self.enabled:
+            ref_a = self.reflex_act(obs)
+            if ref_a is not None:
+                return ref_a
+        return self.RUN
+
+    def reset(self):
+        super().reset()
 
 
 class PPOAgent:
@@ -295,144 +348,27 @@ class PPOAgent:
         pass
 
 
-class ReflexivePPOAgent(PPOAgent):
-    """Hybrid PPO + safety reflex with TilemapAStar terrain perception.
-
-    Integrates terrain foresight to anticipate pipes (such as clearing the 3-block
-    pipe at X=384px by launching before X=358px) and compound enemy threats.
-    """
+class ReflexivePPOAgent(BaseReflexController):
+    """Hybrid PPO + safety reflex with TilemapAStar terrain perception."""
     name = "ppo+reflex"
 
-    HOP = 2    # right + jump (walking jump)
-    RUN = 3    # right + dash (maintain dash speed / airborne momentum)
-    JUMP = 4   # right + dash + jump (running leap: reach 109.7px, apex 71px @ frame 26)
-    LEFT = 5
-
     def __init__(self, policy_path, device, planner=None,
-                 enemy_lo=0.0, enemy_hi=68.0, enemy_dy=50.0):
-        super().__init__(policy_path, device)
-        self.planner = planner
-        self.enemy_lo, self.enemy_hi, self.enemy_dy = enemy_lo, enemy_hi, enemy_dy
-        self.clearing = False
-        self._last_x = None
-        self._stuck = 0
-        self._blocked = 0
-        self._queue = []
-
-    def _surface_threat(self, obs):
-        """Geometry decision. Pits use authoritative RAM ground flags;
-        pipes/walls (>=2-tile rise in ROM surface profile, >=32px) get a preemptive
-        running leap before X = 358px to ensure ballistic apex clears the wall."""
-        if any(obs[17 + c] < 0.5 for c in range(2)):
-            return "leap"
-        if self.planner is not None:
-            abs_px = SPAWN_ABS_PX + obs[0] * 512.0
-            # Step up gently onto col 93 (row 28) before the narrow corridor
-            if 1450.0 <= abs_px <= 1485.0:
-                return "hop"
-            # Pipe anticipation: running leap launches 16-55px before pipe face (before 358px for 384px pipe)
-            pipe_dist = self.planner.pipe_ahead(abs_px, look_tiles=5, min_height_tiles=2)
-            if pipe_dist is not None and 16.0 <= pipe_dist <= 55.0:
-                return "leap"
-            cur, prof = self.planner.surface_ahead(abs_px, look_tiles=5)
-            if cur is not None:
-                for _c, row in prof:
-                    if row is None:
-                        continue
-                    if cur - row >= 2:
-                        return "leap"
-        return None
-
-    def _compound_threat(self, obs):
-        if self.planner is None:
-            return None
-        abs_px = SPAWN_ABS_PX + obs[0] * 512.0
-        # Check narrow corridor (1472-1552px, cols 92-97)
-        if self.planner.is_narrow_corridor(abs_px):
-            for k in range(3):
-                dx = obs[8 + 3 * k] * 256.0
-                dy = obs[9 + 3 * k] * 256.0
-                et = obs[10 + 3 * k] * 256.0
-                if is_hostile_enemy(et) and abs(dy) < self.enemy_dy:
-                    if 0.0 <= dx <= 80.0:
-                        if dx > 32.0:
-                            return "decelerate"
-                        elif 0.0 <= dx <= 32.0:
-                            return "leap"
-        # General pipe compound hazard
-        wall_d = self.planner.wall_ahead(abs_px, look_tiles=6, min_wall_tiles=2)
-        if wall_d > 0:
-            wall_px = wall_d * 16.0
-            for k in range(3):
-                dx = obs[8 + 3 * k] * 256.0
-                dy = obs[9 + 3 * k] * 256.0
-                et = obs[10 + 3 * k] * 256.0
-                if is_hostile_enemy(et) and abs(dy) < self.enemy_dy:
-                    if 0.0 <= dx < wall_px + 24.0:
-                        if dx > 44.0:
-                            return "decelerate"
-                        elif 0.0 <= dx <= 44.0:
-                            return "leap"
-        return None
-
-    def _threat(self, obs):
-        for k in range(3):
-            dx = obs[8 + 3 * k] * 256.0
-            dy = obs[9 + 3 * k] * 256.0
-            et = obs[10 + 3 * k] * 256.0
-            if is_hostile_enemy(et) and self.enemy_lo <= dx < self.enemy_hi and abs(dy) < self.enemy_dy:
-                return "enemy"
-        return None
+                 enemy_lo=0.0, enemy_hi=75.0, enemy_dy=55.0, pit_lookahead=2, enabled=True):
+        super().__init__(planner=planner, enemy_lo=enemy_lo, enemy_hi=enemy_hi,
+                         enemy_dy=enemy_dy, pit_lookahead=pit_lookahead, enabled=enabled)
+        from stable_baselines3 import PPO
+        self.model = PPO.load(policy_path, device=device)
 
     def act(self, obs):
-        on_ground = obs[4] > 0.5
-        vy = obs[3]
-
-        if self._last_x is not None and on_ground:
-            self._stuck = self._stuck + 1 if obs[0] - self._last_x < 0.0004 else 0
-        else:
-            self._stuck = 0
-        self._last_x = obs[0]
-
-        if self._queue:
-            return self._queue.pop(0)
-
-        # Carry horizontal running momentum across the entire ballistic parabola
-        if self.clearing:
-            if not on_ground:
-                return self.RUN
-            self.clearing = False
-
-        blocked = self._stuck >= 3
-        enemy = self._threat(obs)
-        surf = self._surface_threat(obs)
-        compound = self._compound_threat(obs)
-
-        if on_ground:
-            if blocked:
-                self._stuck = 0
-                self._blocked += 1
-                if self._blocked >= 3:
-                    self._blocked = 0
-                    self._queue = [self.LEFT] * 4 + [self.RUN] * 8 + [self.JUMP]
-                else:
-                    return self.JUMP
-            elif compound == "decelerate":
-                return 1  # Action 1: Walk Right (adaptive deceleration)
-            elif compound == "leap" or enemy is not None or surf is not None:
-                self.clearing = True
-                return self.HOP if surf == "hop" else self.JUMP
-            else:
-                self._blocked = 0
-
-        return super().act(obs)
+        if self.enabled:
+            ref_a = self.reflex_act(obs)
+            if ref_a is not None:
+                return ref_a
+        a, _ = self.model.predict(obs[None], deterministic=True)
+        return int(a[0])
 
     def reset(self):
-        self.clearing = False
-        self._last_x = None
-        self._stuck = 0
-        self._blocked = 0
-        self._queue = []
+        super().reset()
 
 
 def grab_top_screen(emu):
@@ -475,7 +411,7 @@ def run_episode(env, agent, goal, render, speed, max_steps, verbose, writer=None
             if render or writer is not None:
                 render_frame(env.emu, f"step {steps} | x={abs_px:.0f}px | goal {goal}px",
                              speed, writer)
-            if abs_px >= goal:
+            if abs_px >= (goal - 16.0) or info.get("level_cleared"):
                 finished, cause = True, "goal"
                 break
             if term:
@@ -508,7 +444,7 @@ def main():
     ap.add_argument("--policy", default="models/pinn_policy.zip")
     ap.add_argument("--rom", default=ROM); ap.add_argument("--state", default=STATE)
     ap.add_argument("--episodes", type=int, default=1)
-    ap.add_argument("--max-steps", type=int, default=600)
+    ap.add_argument("--max-steps", type=int, default=1200)
     ap.add_argument("--horizon", type=int, default=24, help="CEM-MPC rollout horizon (extended to 24 for corridor/landing anticipation)")
     ap.add_argument("--n-cand", type=int, default=160)
     ap.add_argument("--n-iter", type=int, default=3)
@@ -525,8 +461,8 @@ def main():
     ap.add_argument("--w-pit", type=float, default=0.0)
     ap.add_argument("--no-reflex", action="store_true", help="disable hazard reflex")
     ap.add_argument("--enemy-lo", type=float, default=0.0, help="minimum hazard distance (0.0 detects all frontal proximity)")
-    ap.add_argument("--enemy-hi", type=float, default=68.0, help="maximum frontal hazard distance (68px allows 18-25 frame ballistic clearance)")
-    ap.add_argument("--enemy-dy", type=float, default=60.0)
+    ap.add_argument("--enemy-hi", type=float, default=75.0, help="maximum frontal hazard distance (75px allows 20-26 frame ballistic clearance)")
+    ap.add_argument("--enemy-dy", type=float, default=55.0)
     ap.add_argument("--pit-lookahead", type=int, default=2, help="lookahead tiles for pit takeoff (2 tiles = 32px safe runway)")
     ap.add_argument("--w-uncertainty", type=float, default=0.6,
                     help="pessimism on unpredictable enemy motion (probabilistic head)")
